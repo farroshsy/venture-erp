@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1.0.0",
+  "scoring": "Evidence-based maturity model; scores are computed from declared controls, not self-attestation.",
+  "services": [
+    { "id": "platform-kernel", "targetMaturity": "L3", "currentEvidence": ["documentation", "unitTests", "contractTests", "structuredLogs", "metrics", "threatModel", "dependencyReview", "rollbackPlan"], "gaps": ["integrationTests", "traces", "onCall", "resilienceTest"] },
+    { "id": "portfolio-governance", "targetMaturity": "L3", "currentEvidence": ["documentation", "unitTests", "contractTests", "structuredLogs", "threatModel", "dependencyReview", "rollbackPlan"], "gaps": ["integrationTests", "metrics", "traces", "onCall", "resilienceTest"] },
+    { "id": "decision-governance", "targetMaturity": "L3", "currentEvidence": ["documentation", "unitTests", "contractTests", "structuredLogs", "metrics", "threatModel", "dependencyReview", "rollbackPlan"], "gaps": ["integrationTests", "traces", "onCall", "resilienceTest"] }
+  ]
+}

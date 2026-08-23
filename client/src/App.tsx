@@ -1,16 +1,26 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { EnterpriseShell } from "@/components/EnterpriseShell";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import { VentureProvider } from "./contexts/VentureContext";
+import Architecture from "./pages/Architecture";
+import DecisionGovernance from "./pages/DecisionGovernance";
+import ModuleCatalog from "./pages/ModuleCatalog";
+import OperationsWorkspace from "./pages/OperationsWorkspace";
+import PortfolioDashboard from "./pages/PortfolioDashboard";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
+      <Route path={"/"} component={PortfolioDashboard} />
+      <Route path={"/modules"} component={ModuleCatalog} />
+      <Route path={"/operations"} component={OperationsWorkspace} />
+      <Route path={"/decisions"} component={DecisionGovernance} />
+      <Route path={"/architecture"} component={Architecture} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
@@ -31,8 +41,12 @@ function App() {
         // switchable
       >
         <TooltipProvider>
-          <Toaster />
-          <Router />
+          <VentureProvider>
+            <EnterpriseShell>
+              <Router />
+            </EnterpriseShell>
+            <Toaster richColors position="top-right" />
+          </VentureProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

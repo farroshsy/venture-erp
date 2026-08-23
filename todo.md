@@ -1,0 +1,29 @@
+# Venture ERP — Project TODO
+
+- [x] Define the microservices-first evolution strategy, including a decision record comparing immediate distributed services, modular monolith, and hybrid service-slice approaches.
+- [x] Define bounded contexts, data ownership rules, stable versioned contracts, and service-extraction criteria for portfolio, finance, procurement, inventory, people, projects, identity, and decision governance.
+- [x] Establish the proposed code-directory revamp and repository conventions for platform code, domain modules, contracts, infrastructure, documentation, templates, and runbooks.
+- [x] Implement venture/tenant entities, memberships, venture-scoped data access helpers, and tenant-aware permission boundaries in the schema and server layer.
+- [x] Implement the platform control-plane catalog showing ERP modules, owners, release versions, API-contract versions, health, service maturity, and deployment independence.
+- [x] Implement portfolio dashboard data and visualizations for venture health, operating posture, active decisions, and cross-venture governance.
+- [x] Implement initial module workspace experiences for finance, procurement, inventory, people, and project operations, with clear bounded-context ownership and stable integration seams.
+- [x] Add portfolio dashboard sections backed by governed decision data, including active-decision counts, decision status, and a cross-venture governance view.
+- [x] Add initial bounded-context workspace panels for finance, procurement, inventory, people, and project operations, using domain-specific operating controls rather than catalog descriptions alone.
+- [x] Implement the API gateway/service-contract registry facade with versioned contract metadata and compatible-release guidance.
+- [x] Implement a build-versus-buy decision framework comparing SAP, ERP alternatives, and custom development across differentiation, compliance, integration, cost, lock-in, and delivery capacity.
+- [x] Implement an AI-assisted evidence-review workflow that returns a draft only, exposes assumptions, and requires human approval before a decision is recorded.
+- [x] Add an ADR system covering service strategy, tenant isolation, contract versioning, eventing, observability, architecture migration, and rejected alternatives.
+- [x] Verify ADR-004 and ADR-005, then add and verify an ADR recording the service-aligned-foundation-to-federated-services migration decision.
+- [x] Add CI/CD and platform engineering standards documenting quality gates, static analysis, dependency and security management, contract tests, integration tests, deployment verification, and infrastructure as code.
+- [x] Add measurable service maturity levels and operational-readiness scorecards for documentation, testing, observability, security, resilience, and support.
+- [x] Add modular-monolith-to-microservices migration paths, transitional patterns, rollback strategies, dependency-reduction milestones, and success measures.
+- [x] Write an executive architecture handbook and a production-minded README with operating philosophy, domain model, scaling roadmap, developer workflow, and directory map.
+- [x] Verify the README, executive handbook, and upgrade decision matrix are present and cover the required architecture, governance, and developer-workflow material.
+- [x] Add focused Vitest coverage for tenant scoping, maturity calculation, release compatibility, decision scoring, and AI-review approval guardrails.
+- [x] Add integration-style tenant-isolation coverage proving membership enforcement and preventing cross-venture governance data exposure.
+- [x] Add router-level tenant-isolation tests covering active membership success, forbidden access to another venture, and portfolio governance results filtered by the caller’s accessible venture set.
+- [x] Add a router-level `platform.portfolioOverview` test proving the caller receives governance results only for their accessible ventures.
+- [x] Run type checking, tests, database migration verification, and responsive visual checks; resolve all issues found.
+- [x] Capture and review the portfolio, operations, decision, and architecture routes at mobile, tablet, and desktop breakpoints; record the results.
+- [x] Verify the persisted responsive-validation findings in `docs/platform/VALIDATION-NOTES.md` before the completion checkpoint.
+- [ ] Capture the completed implementation in a single reviewable project checkpoint.

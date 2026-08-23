@@ -10,6 +10,9 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
+    "test:integration": "vitest run server/**/*.integration.test.ts",
+    "contracts:validate": "node scripts/validate-contracts.mjs",
+    "verify:foundation": "node scripts/verify-foundation.mjs",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {

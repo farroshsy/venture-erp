@@ -1,7 +1,8 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, decisionEvidenceReviews, governanceCases, users, ventureMemberships, ventures } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { compileScopedPortfolioGovernance } from "./platform/portfolio";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -89,4 +90,148 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+function slugifyVentureName(name: string) {
+  const base = name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 72);
+  return base || "venture";
+}
+
+export async function listVenturesForUser(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: ventures.id,
+      slug: ventures.slug,
+      name: ventures.name,
+      legalName: ventures.legalName,
+      status: ventures.status,
+      baseCurrency: ventures.baseCurrency,
+      timezone: ventures.timezone,
+      role: ventureMemberships.role,
+    })
+    .from(ventureMemberships)
+    .innerJoin(ventures, eq(ventureMemberships.ventureId, ventures.id))
+    .where(and(eq(ventureMemberships.userId, userId), eq(ventureMemberships.status, "active")));
+}
+
+export async function getVentureMembership(userId: number, ventureId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db
+    .select()
+    .from(ventureMemberships)
+    .where(and(eq(ventureMemberships.userId, userId), eq(ventureMemberships.ventureId, ventureId)))
+    .limit(1);
+  return rows[0];
+}
+
+export async function createVentureWithOwner(input: {
+  name: string;
+  legalName?: string;
+  baseCurrency: string;
+  timezone: string;
+  ownerUserId: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available.");
+
+  const baseSlug = slugifyVentureName(input.name);
+  const slug = `${baseSlug}-${Date.now().toString(36)}`;
+  const result = await db.insert(ventures).values({
+    slug,
+    name: input.name,
+    legalName: input.legalName,
+    baseCurrency: input.baseCurrency,
+    timezone: input.timezone,
+  });
+  const ventureId = Number(result[0].insertId);
+  await db.insert(ventureMemberships).values({
+    ventureId,
+    userId: input.ownerUserId,
+    role: "portfolio_admin",
+    status: "active",
+  });
+  return { id: ventureId, slug, name: input.name, role: "portfolio_admin" as const };
+}
+
+export async function listGovernanceCasesForVenture(ventureId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(governanceCases).where(eq(governanceCases.ventureId, ventureId)).orderBy(desc(governanceCases.updatedAt));
+}
+
+type PortfolioGovernanceDependencies = {
+  listAccessibleVentures: (userId: number) => ReturnType<typeof listVenturesForUser>;
+  listCasesForVenture: (ventureId: number) => ReturnType<typeof listGovernanceCasesForVenture>;
+};
+
+export function createPortfolioGovernanceQuery(dependencies: PortfolioGovernanceDependencies) {
+  return async function getPortfolioGovernanceForUser(userId: number) {
+    const accessibleVentures = await dependencies.listAccessibleVentures(userId);
+    const casesByAccessibleVenture = await Promise.all(accessibleVentures.map(venture => dependencies.listCasesForVenture(venture.id)));
+    return compileScopedPortfolioGovernance(accessibleVentures, casesByAccessibleVenture);
+  };
+}
+
+export const getPortfolioGovernanceForUser = createPortfolioGovernanceQuery({
+  listAccessibleVentures: listVenturesForUser,
+  listCasesForVenture: listGovernanceCasesForVenture,
+});
+
+export async function createGovernanceCase(input: {
+  ventureId: number;
+  title: string;
+  capability: string;
+  recommendation: "sap" | "alternative" | "custom";
+  criteria: unknown;
+  evidence: unknown;
+  assumptions: unknown;
+  rationale: string;
+  createdByUserId: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available.");
+  const result = await db.insert(governanceCases).values(input);
+  return { id: Number(result[0].insertId), ...input, status: "draft" as const };
+}
+
+export async function createDecisionEvidenceReview(input: {
+  governanceCaseId: number;
+  model: string;
+  summary: string;
+  assumptions: unknown;
+  risks: unknown;
+  createdByUserId: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available.");
+  const result = await db.insert(decisionEvidenceReviews).values({ ...input, humanApprovalRequired: 1 });
+  return { id: Number(result[0].insertId), ...input, status: "draft" as const, humanApprovalRequired: true };
+}
+
+export async function getGovernanceCase(reviewId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db
+    .select({ ventureId: governanceCases.ventureId, governanceCaseId: decisionEvidenceReviews.governanceCaseId })
+    .from(decisionEvidenceReviews)
+    .innerJoin(governanceCases, eq(decisionEvidenceReviews.governanceCaseId, governanceCases.id))
+    .where(eq(decisionEvidenceReviews.id, reviewId))
+    .limit(1);
+  return rows[0];
+}
+
+export async function approveDecisionEvidenceReview(reviewId: number, approverUserId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available.");
+  await db.update(decisionEvidenceReviews).set({ status: "approved", approvedByUserId: approverUserId, approvedAt: new Date() }).where(eq(decisionEvidenceReviews.id, reviewId));
+  return { success: true, reviewId, status: "approved" as const };
+}
+
+export { decisionEvidenceReviews, governanceCases };

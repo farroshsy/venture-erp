@@ -1,0 +1,22 @@
+{
+  "contractId": "erp-platform.v1",
+  "version": "1.0.0",
+  "owner": "Platform Kernel",
+  "compatibility": "backward-compatible",
+  "tenantContext": {
+    "required": true,
+    "claim": "ventureId",
+    "rule": "The gateway resolves this claim from an authenticated membership; clients cannot self-assert it."
+  },
+  "operations": [
+    { "name": "portfolio.snapshot", "purpose": "Return a venture-scoped or portfolio-scoped operational read model." },
+    { "name": "platform.catalog", "purpose": "Return module ownership, health, release, and contract status." },
+    { "name": "governance.evaluate", "purpose": "Score SAP, alternative ERP, and custom-delivery paths using governed criteria." },
+    { "name": "governance.reviewEvidence", "purpose": "Draft, but never approve, an evidence review for a human decision-maker." }
+  ],
+  "events": [
+    { "name": "venture.context.changed.v1", "producer": "Platform Kernel", "classification": "internal" },
+    { "name": "decision.review.drafted.v1", "producer": "Decision Governance", "classification": "internal" },
+    { "name": "decision.approved.v1", "producer": "Decision Governance", "classification": "internal" }
+  ]
+}
