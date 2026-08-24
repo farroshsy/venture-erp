@@ -19,6 +19,8 @@ const navigation = [
   { path: "/inventory", label: "Inventory control", icon: Boxes },
   { path: "/procurement", label: "Procurement control", icon: Workflow },
   { path: "/work", label: "Work control", icon: Workflow },
+  { path: "/cash", label: "Cash control", icon: Landmark },
+  { path: "/insights", label: "Operational insights", icon: LayoutDashboard },
   { path: "/asia", label: "Asia operations", icon: Globe2 },
   { path: "/cross-border", label: "Cross-border finance", icon: ArrowRightLeft },
   { path: "/decisions", label: "Decision governance", icon: Scale },

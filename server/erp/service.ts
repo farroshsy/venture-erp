@@ -145,6 +145,34 @@ export async function createOperationalRecord(input: { ventureId: number; domain
   return { id, ...input, status, amount, taxAmount: tax.taxAmount, totalAmount: tax.totalAmount, transactionCurrency, functionalCurrency, functionalAmount, exchangeRateId: exchangeRate?.id, budgetException };
 }
 
+export type InvoiceType = "receivable_invoice" | "payable_invoice";
+
+export async function createInvoiceRecord(input: { ventureId: number; invoiceType: InvoiceType; recordNumber: string; title: string; counterpartyMasterId: number; accountingPeriodId?: number; taxPolicyId?: number; amount: number; effectiveDate: string; dueDate?: string; data: Record<string, unknown>; createdByUserId: number }) {
+  const db = await requireDb();
+  const counterparty = await requireMaster(db, input.ventureId, input.counterpartyMasterId);
+  const expectedDomain = input.invoiceType === "receivable_invoice" ? "customer" : "supplier";
+  if (counterparty.domain !== expectedDomain) throw new Error(`${input.invoiceType === "receivable_invoice" ? "Receivable" : "Payable"} invoices require an active ${expectedDomain} master record.`);
+  return createOperationalRecord({ ventureId: input.ventureId, domain: input.invoiceType === "receivable_invoice" ? "sales" : "procurement", recordType: input.invoiceType, recordNumber: input.recordNumber, title: input.title, counterpartyMasterId: input.counterpartyMasterId, accountingPeriodId: input.accountingPeriodId, taxPolicyId: input.taxPolicyId, amount: input.amount, effectiveDate: input.effectiveDate, dueDate: input.dueDate, data: { ...input.data, invoiceType: input.invoiceType, noExternalCollectionOrDisbursement: true }, createdByUserId: input.createdByUserId });
+}
+
+export async function createInternalPaymentRecord(input: { ventureId: number; recordNumber: string; title: string; invoiceRecordId: number; amount: number; effectiveDate: string; data: Record<string, unknown>; createdByUserId: number }) {
+  const db = await requireDb();
+  const rows = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.id, input.invoiceRecordId), eq(erpOperationalRecords.ventureId, input.ventureId))).limit(1);
+  const invoice = rows[0];
+  if (!invoice || !["receivable_invoice", "payable_invoice"].includes(invoice.recordType)) throw new Error("Payment records must reference a receivable or payable invoice in the active venture.");
+  return createOperationalRecord({ ventureId: input.ventureId, domain: "finance", recordType: "payment_record", recordNumber: input.recordNumber, title: input.title, counterpartyMasterId: invoice.counterpartyMasterId ?? undefined, accountingPeriodId: invoice.accountingPeriodId ?? undefined, amount: input.amount, effectiveDate: input.effectiveDate, data: { ...input.data, invoiceRecordId: invoice.id, noExternalExecution: true, paymentEvidenceOnly: true }, createdByUserId: input.createdByUserId });
+}
+
+export async function listInvoiceSettlements(ventureId: number) {
+  const records = await listOperationalRecords({ ventureId });
+  const invoices = records.filter(record => ["receivable_invoice", "payable_invoice"].includes(record.recordType));
+  const postedPayments = records.filter(record => record.recordType === "payment_record" && ["posted", "fulfilled", "closed"].includes(record.status));
+  return invoices.map(invoice => {
+    const settledAmount = postedPayments.filter(payment => Number((payment.data as { invoiceRecordId?: unknown }).invoiceRecordId) === invoice.id).reduce((total, payment) => total + Number(payment.totalAmount), 0);
+    return { invoice, settledAmount: normalizeMoney(settledAmount), openAmount: normalizeMoney(Math.max(0, Number(invoice.totalAmount) - settledAmount)) };
+  });
+}
+
 export async function listOperationalRecords(input: { ventureId: number; domain?: OperationalDomain }) {
   const db = await requireDb();
   return db.select().from(erpOperationalRecords).where(input.domain ? and(eq(erpOperationalRecords.ventureId, input.ventureId), eq(erpOperationalRecords.domain, input.domain)) : eq(erpOperationalRecords.ventureId, input.ventureId)).orderBy(desc(erpOperationalRecords.updatedAt));
@@ -156,6 +184,15 @@ export async function transitionOperationalRecord(input: { ventureId: number; op
   const record = rows[0];
   if (!record) throw new Error("Operational record not found in the active venture.");
   if (!canTransition(record.status, input.targetStatus)) throw new Error(`Cannot transition ${record.status} to ${input.targetStatus}.`);
+  if (record.recordType === "payment_record" && input.targetStatus === "posted") {
+    const invoiceRecordId = Number((record.data as { invoiceRecordId?: unknown }).invoiceRecordId);
+    if (!Number.isInteger(invoiceRecordId) || invoiceRecordId <= 0) throw new Error("Payment record is missing its invoice reference.");
+    const settlements = await listInvoiceSettlements(input.ventureId);
+    const settlement = settlements.find(item => item.invoice.id === invoiceRecordId);
+    if (!settlement) throw new Error("Payment invoice reference is not available in the active venture.");
+    if (!["approved", "posted", "fulfilled"].includes(settlement.invoice.status)) throw new Error("Invoice must be approved or posted before internal payment evidence can be posted.");
+    if (Number(record.totalAmount) > settlement.openAmount) throw new Error("Internal payment amount exceeds the invoice open balance.");
+  }
   const updates: Partial<typeof erpOperationalRecords.$inferInsert> = { status: input.targetStatus };
   if (input.targetStatus === "approved") { updates.approvedByUserId = input.actorUserId; updates.approvedAt = new Date(); }
   await db.update(erpOperationalRecords).set(updates).where(eq(erpOperationalRecords.id, input.operationalRecordId));
@@ -353,11 +390,13 @@ export async function completeWorkflowTask(input: { ventureId: number; workflowT
 }
 
 export async function getOperationalDashboard(ventureId: number) {
-  const [records, budgets, tasks, audits] = await Promise.all([
+  const [records, budgets, tasks, audits, inventoryBalances, invoiceSettlements] = await Promise.all([
     listOperationalRecords({ ventureId }),
     listBudgetEnvelopes(ventureId),
     listWorkflowTasks(ventureId),
     listAuditEvents(ventureId),
+    listInventoryBalances(ventureId),
+    listInvoiceSettlements(ventureId),
   ]);
   const byDomain = records.reduce<Record<string, { count: number; total: number; pending: number }>>((result, record) => {
     const entry = result[record.domain] ?? { count: 0, total: 0, pending: 0 };
@@ -367,6 +406,22 @@ export async function getOperationalDashboard(ventureId: number) {
     byDomain,
     openTasks: tasks.filter(task => task.status === "pending").length,
     budgetUtilization: budgets.map(budget => ({ id: budget.id, code: budget.code, name: budget.name, amount: Number(budget.amount), committed: Number(budget.committedAmount), spent: Number(budget.spentAmount), remaining: Number(budget.amount) - Number(budget.committedAmount) - Number(budget.spentAmount), status: budget.status })),
+    finance: {
+      receivableOpen: invoiceSettlements.filter(item => item.invoice.recordType === "receivable_invoice").reduce((total, item) => total + item.openAmount, 0),
+      payableOpen: invoiceSettlements.filter(item => item.invoice.recordType === "payable_invoice").reduce((total, item) => total + item.openAmount, 0),
+      postedInternalPaymentEvidence: records.filter(record => record.recordType === "payment_record" && ["posted", "fulfilled", "closed"].includes(record.status)).length,
+    },
+    inventory: {
+      trackedItems: inventoryBalances.length,
+      onHandQuantity: inventoryBalances.reduce((total, item) => total + Number(item.onHandQuantity), 0),
+      reservedQuantity: inventoryBalances.reduce((total, item) => total + Number(item.reservedQuantity), 0),
+      availableQuantity: inventoryBalances.reduce((total, item) => total + item.availableQuantity, 0),
+    },
+    procurement: {
+      openPurchaseOrders: records.filter(record => record.domain === "procurement" && record.recordType === "purchase_order" && !["fulfilled", "closed", "cancelled"].includes(record.status)).length,
+      fulfilledPurchaseOrders: records.filter(record => record.domain === "procurement" && record.recordType === "purchase_order" && record.status === "fulfilled").length,
+    },
+    work: Object.fromEntries(["people", "projects", "assets", "service", "crm"].map(domain => [domain, records.filter(record => record.domain === domain && !["closed", "cancelled"].includes(record.status)).length])),
     latestAuditEvents: audits.slice(0, 12),
   };
 }

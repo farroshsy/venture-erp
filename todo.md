@@ -72,10 +72,12 @@
 - [x] Add router-level negative country-pack tests proving payroll and public-budget mutations surface unselected or wrong-venture pack applicability rejection.
 - [x] Add explicit service proof that a jurisdiction-pack selection belonging to another venture is rejected for pack-dependent payroll and public-budget workflows.
 - [ ] Rehearse a pack-dependent payroll run only after a qualified local reviewer supplies an effective-dated, source-linked, reviewed and actively selected payroll pack for an authorized venture.
-- [ ] Reduce the main client bundle through route-level code splitting before a broad production rollout.
+- [x] Reduce the main client bundle through route-level code splitting before a broad production rollout.
 - [x] Implement balanced draft/post journal batches with period-close guards, tenant-scoped accounts, and audit evidence.
 - [x] Implement balanced draft/post journal batches with period-close guards, tenant-scoped accounts, and audit evidence.
 - [x] Implement finance-lead accounting-period close controls with audit evidence and router coverage.
 - [x] Implement tenant-scoped inventory movements and stock reservations with non-negative availability guards and audit evidence.
 - [x] Implement approved purchase-order receiving that records guarded inventory receipts and advances the procurement lifecycle with audit evidence.
 - [x] Add a domain-specific work-management control workspace for people, projects, assets, service, and CRM records using the live tenant-scoped lifecycle and audit APIs.
+- [x] Implement tenant-scoped receivable, payable, and internal payment-record controls with counterparty, invoice-linkage, open-balance, audit, and no-execution safeguards.
+- [x] Implement a tenant-scoped operational-insights dashboard sourced from real financial, invoice, inventory, procurement, work, workflow, and audit records.

@@ -24,6 +24,9 @@ vi.mock("../erp/service", () => ({
   listInventoryMovements: vi.fn(),
   recordInventoryMovement: vi.fn(),
   receivePurchaseOrder: vi.fn(),
+  listInvoiceSettlements: vi.fn(),
+  createInvoiceRecord: vi.fn(),
+  createInternalPaymentRecord: vi.fn(),
   listWorkflowDefinitions: vi.fn(),
   createWorkflowDefinition: vi.fn(),
   activateWorkflowDefinition: vi.fn(),
@@ -119,6 +122,16 @@ describe("operational ERP router", () => {
     vi.mocked(service.receivePurchaseOrder).mockResolvedValue({ purchaseOrderRecordId: 17, inventoryMovementId: 45, status: "fulfilled", finalReceipt: true } as never);
     await expect(caller().inventory.receivePurchaseOrder({ ventureId: 21, purchaseOrderRecordId: 17, itemMasterId: 13, quantity: 2, narrative: "Final receipt", finalReceipt: true })).resolves.toMatchObject({ status: "fulfilled", finalReceipt: true });
     expect(service.receivePurchaseOrder).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, purchaseOrderRecordId: 17, itemMasterId: 13, actorUserId: 7, finalReceipt: true }));
+  });
+  it("forwards customer-linked invoice and internal payment evidence through finance-authorized tenant routes", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.createInvoiceRecord).mockResolvedValue({ id: 62, recordType: "receivable_invoice", status: "draft" } as never);
+    vi.mocked(service.createInternalPaymentRecord).mockResolvedValue({ id: 63, recordType: "payment_record", status: "draft" } as never);
+    await expect(caller().invoice.create({ ventureId: 21, invoiceType: "receivable_invoice", recordNumber: "AR-001", title: "Controlled receivable", counterpartyMasterId: 12, amount: 100, effectiveDate: "2026-08-24", data: {} })).resolves.toMatchObject({ id: 62 });
+    await expect(caller().invoice.createPaymentRecord({ ventureId: 21, recordNumber: "PAY-001", title: "Internal payment evidence", invoiceRecordId: 62, amount: 100, effectiveDate: "2026-08-24", data: {} })).resolves.toMatchObject({ id: 63 });
+    expect(service.createInvoiceRecord).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, invoiceType: "receivable_invoice", counterpartyMasterId: 12, createdByUserId: 7 }));
+    expect(service.createInternalPaymentRecord).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, invoiceRecordId: 62, createdByUserId: 7 }));
   });
   it("forwards a selected public-budget jurisdiction pack only through a finance-authorized venture route", async () => {
     vi.mocked(requireVentureRole).mockReset();

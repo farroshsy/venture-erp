@@ -1,26 +1,30 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
-import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
+import { lazy, Suspense } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { VentureProvider } from "./contexts/VentureContext";
-import Architecture from "./pages/Architecture";
-import ArchitectureGovernance from "./pages/ArchitectureGovernance";
-import ArchitectureAssistant from "./pages/ArchitectureAssistant";
-import AsiaOperations from "./pages/AsiaOperations";
-import CrossBorderFinance from "./pages/CrossBorderFinance";
-import AccessAdministration from "./pages/AccessAdministration";
-import DecisionGovernance from "./pages/DecisionGovernance";
-import ExecutiveArchitecture from "./pages/ExecutiveArchitecture";
-import JournalControl from "./pages/JournalControl";
-import InventoryControl from "./pages/InventoryControl";
-import ProcurementControl from "./pages/ProcurementControl";
-import WorkControl from "./pages/WorkControl";
-import ModuleCatalog from "./pages/ModuleCatalog";
-import OperationsWorkspace from "./pages/OperationsWorkspace";
-import PortfolioDashboard from "./pages/PortfolioDashboard";
+
+const NotFound = lazy(() => import("@/pages/NotFound"));
+const Architecture = lazy(() => import("./pages/Architecture"));
+const ArchitectureGovernance = lazy(() => import("./pages/ArchitectureGovernance"));
+const ArchitectureAssistant = lazy(() => import("./pages/ArchitectureAssistant"));
+const AsiaOperations = lazy(() => import("./pages/AsiaOperations"));
+const CrossBorderFinance = lazy(() => import("./pages/CrossBorderFinance"));
+const AccessAdministration = lazy(() => import("./pages/AccessAdministration"));
+const DecisionGovernance = lazy(() => import("./pages/DecisionGovernance"));
+const ExecutiveArchitecture = lazy(() => import("./pages/ExecutiveArchitecture"));
+const JournalControl = lazy(() => import("./pages/JournalControl"));
+const InventoryControl = lazy(() => import("./pages/InventoryControl"));
+const ProcurementControl = lazy(() => import("./pages/ProcurementControl"));
+const WorkControl = lazy(() => import("./pages/WorkControl"));
+const CashControl = lazy(() => import("./pages/CashControl"));
+const OperationalInsights = lazy(() => import("./pages/OperationalInsights"));
+const ModuleCatalog = lazy(() => import("./pages/ModuleCatalog"));
+const OperationsWorkspace = lazy(() => import("./pages/OperationsWorkspace"));
+const PortfolioDashboard = lazy(() => import("./pages/PortfolioDashboard"));
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -37,6 +41,8 @@ function Router() {
       <Route path={"/inventory"} component={InventoryControl} />
       <Route path={"/procurement"} component={ProcurementControl} />
       <Route path={"/work"} component={WorkControl} />
+      <Route path={"/cash"} component={CashControl} />
+      <Route path={"/insights"} component={OperationalInsights} />
       <Route path={"/asia"} component={AsiaOperations} />
       <Route path={"/cross-border"} component={CrossBorderFinance} />
       <Route path={"/decisions"} component={DecisionGovernance} />
@@ -63,7 +69,9 @@ function App() {
         <TooltipProvider>
           <VentureProvider>
             <EnterpriseShell>
-              <Router />
+              <Suspense fallback={<div className="rounded-2xl border border-[#dfe3dc] bg-white p-8 text-sm text-[#5f6f65]">Loading the selected operational workspace…</div>}>
+                <Router />
+              </Suspense>
             </EnterpriseShell>
             <Toaster richColors position="top-right" />
           </VentureProvider>

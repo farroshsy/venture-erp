@@ -99,3 +99,19 @@ The domain-specific Work Control workspace was exercised through the real projec
 ### Transaction-specific increment quality gate
 
 The journal, period-close, inventory, purchase-order receipt, and work-control increment passed TypeScript checking, the 51-test suite, eight integration tests, contract validation, foundation verification, and a production build. The production build continues to emit a client bundle-size advisory; route-level code splitting remains recorded as a performance follow-up before broad rollout.
+
+### Invoice and internal payment evidence
+
+The real receivables control path was exercised in the authorized validation venture with a clearly labelled customer, receivable invoice, and internal payment-evidence record. `VALIDATION-AR-20260824` reached `posted` with total `100.00`; linked posted evidence `VALIDATION-PAY-EVIDENCE-20260824` accounted for `60.00`, leaving an internally calculated open amount of `40.00`. The operation did not issue a collection, debit a customer, send a payment file, or contact a payment processor, bank, tax authority, or other external party.
+
+The authenticated Cash Control workspace rendered the validation customer, the posted invoice, linked internal evidence input path, and settlement register showing total `100`, settled `60`, and open `40`. Its visible copy retained the no-payment-rail and no-external-settlement boundary.
+
+### Operational insights dashboard
+
+The authenticated Operational Insights workspace rendered only persisted validation-venture data: receivable open `40`, inventory available `5`, one tracked inventory balance with `8` on hand and `3` reserved, one posted internal payment-evidence record, and one fulfilled purchase order. The page explicitly distinguishes operational metrics from bank balances, filing status, and external-system claims.
+
+### Route-loading performance
+
+The route registry now lazy-loads operational workspaces and separates React, UI, data/runtime, and remaining vendor code. The production build now emits an entry chunk of approximately `35.5 kB` and a largest vendor chunk of approximately `401.0 kB`, with all routed operational pages emitted as separate chunks; the previous 500 kB advisory no longer appears.
+
+The receivables, internal-payment-evidence, operational-insights, and performance increment passed TypeScript checking, the 52-test suite, eight integration tests, contract validation, foundation verification, and a production build with route and vendor chunks.
