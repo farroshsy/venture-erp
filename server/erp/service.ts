@@ -163,6 +163,21 @@ export async function createInternalPaymentRecord(input: { ventureId: number; re
   return createOperationalRecord({ ventureId: input.ventureId, domain: "finance", recordType: "payment_record", recordNumber: input.recordNumber, title: input.title, counterpartyMasterId: invoice.counterpartyMasterId ?? undefined, accountingPeriodId: invoice.accountingPeriodId ?? undefined, amount: input.amount, effectiveDate: input.effectiveDate, data: { ...input.data, invoiceRecordId: invoice.id, noExternalExecution: true, paymentEvidenceOnly: true }, createdByUserId: input.createdByUserId });
 }
 
+export async function convertProcurementRequestToPurchaseOrder(input: { ventureId: number; procurementRequestRecordId: number; purchaseOrderNumber: string; supplierMasterId: number; title: string; dueDate?: string; actorUserId: number }) {
+  const db = await requireDb();
+  const [request] = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.id, input.procurementRequestRecordId), eq(erpOperationalRecords.ventureId, input.ventureId))).limit(1);
+  if (!request || request.domain !== "procurement" || request.recordType !== "procurement_request") throw new Error("Approved procurement request not found in the active venture.");
+  if (request.status !== "approved") throw new Error("Procurement requests must be approved before conversion to a purchase order.");
+  const supplier = await requireMaster(db, input.ventureId, input.supplierMasterId);
+  if (supplier.domain !== "supplier" || supplier.status !== "active") throw new Error("Purchase-order conversion requires an active supplier master record.");
+  const procurementRecords = await listOperationalRecords({ ventureId: input.ventureId, domain: "procurement" });
+  if (procurementRecords.some(record => record.recordType === "purchase_order" && Number((record.data as { procurementRequestRecordId?: unknown }).procurementRequestRecordId) === request.id)) throw new Error("A purchase order already exists for this procurement request in the active venture.");
+  const purchaseOrder = await createOperationalRecord({ ventureId: input.ventureId, domain: "procurement", recordType: "purchase_order", recordNumber: input.purchaseOrderNumber, title: input.title, counterpartyMasterId: supplier.id, accountingPeriodId: request.accountingPeriodId ?? undefined, budgetEnvelopeId: request.budgetEnvelopeId ?? undefined, publicBudgetNodeId: request.publicBudgetNodeId ?? undefined, taxPolicyId: request.taxPolicyId ?? undefined, transactionCurrency: request.transactionCurrency, functionalCurrency: request.functionalCurrency, exchangeRateId: request.exchangeRateId ?? undefined, amount: Number(request.amount), effectiveDate: request.effectiveDate, dueDate: input.dueDate, data: { ...(request.data as Record<string, unknown>), procurementRequestRecordId: request.id, conversionEvidence: "approved_procurement_request", noSupplierPayment: true, noExternalProcurementAction: true }, createdByUserId: input.actorUserId });
+  await transitionOperationalRecord({ ventureId: input.ventureId, operationalRecordId: request.id, targetStatus: "posted", note: `Converted to purchase order ${purchaseOrder.recordNumber}`, actorUserId: input.actorUserId });
+  await createAuditEvent({ ventureId: input.ventureId, domain: "procurement", operationalRecordId: request.id, eventType: "procurement_request.converted", actorUserId: input.actorUserId, payload: { purchaseOrderRecordId: purchaseOrder.id, purchaseOrderNumber: purchaseOrder.recordNumber, supplierMasterId: supplier.id, noSupplierPayment: true, noExternalProcurementAction: true } });
+  return { procurementRequestRecordId: request.id, purchaseOrderRecordId: purchaseOrder.id, purchaseOrderStatus: purchaseOrder.status, requestStatus: "posted" as const };
+}
+
 export async function listInvoiceSettlements(ventureId: number) {
   const records = await listOperationalRecords({ ventureId });
   const invoices = records.filter(record => ["receivable_invoice", "payable_invoice"].includes(record.recordType));

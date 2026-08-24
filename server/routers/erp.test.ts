@@ -24,6 +24,7 @@ vi.mock("../erp/service", () => ({
   listInventoryMovements: vi.fn(),
   recordInventoryMovement: vi.fn(),
   receivePurchaseOrder: vi.fn(),
+  convertProcurementRequestToPurchaseOrder: vi.fn(),
   reserveSalesOrderInventory: vi.fn(),
   fulfillSalesOrderInventory: vi.fn(),
   listInvoiceSettlements: vi.fn(),
@@ -141,6 +142,13 @@ describe("operational ERP router", () => {
     vi.mocked(service.receivePurchaseOrder).mockResolvedValue({ purchaseOrderRecordId: 17, inventoryMovementId: 45, status: "fulfilled", finalReceipt: true } as never);
     await expect(caller().inventory.receivePurchaseOrder({ ventureId: 21, purchaseOrderRecordId: 17, itemMasterId: 13, quantity: 2, narrative: "Final receipt", finalReceipt: true })).resolves.toMatchObject({ status: "fulfilled", finalReceipt: true });
     expect(service.receivePurchaseOrder).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, purchaseOrderRecordId: 17, itemMasterId: 13, actorUserId: 7, finalReceipt: true }));
+  });
+  it("forwards approved procurement-request conversion through the tenant procurement route", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "operator", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.convertProcurementRequestToPurchaseOrder).mockResolvedValue({ procurementRequestRecordId: 40, purchaseOrderRecordId: 41, purchaseOrderStatus: "draft", requestStatus: "posted" } as never);
+    await expect(caller().procurement.convertRequest({ ventureId: 21, procurementRequestRecordId: 40, purchaseOrderNumber: "PO-001", supplierMasterId: 12, title: "Controlled conversion", dueDate: "2026-09-01" })).resolves.toMatchObject({ purchaseOrderRecordId: 41, requestStatus: "posted" });
+    expect(service.convertProcurementRequestToPurchaseOrder).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, procurementRequestRecordId: 40, purchaseOrderNumber: "PO-001", supplierMasterId: 12, actorUserId: 7 }));
   });
   it("forwards order-linked inventory reservation and final fulfillment through tenant sales routes", async () => {
     vi.mocked(requireVentureRole).mockReset();
