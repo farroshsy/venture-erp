@@ -4,6 +4,7 @@ vi.mock("../erp/service", () => ({
   listOperationalRecords: vi.fn(),
   createOperationalRecord: vi.fn(),
   getOperationalDashboard: vi.fn(),
+  getAccessiblePortfolioDashboard: vi.fn(),
   listMasterRecords: vi.fn(),
   createMasterRecord: vi.fn(),
   getVentureCurrencyPolicy: vi.fn(),
@@ -70,9 +71,11 @@ vi.mock("../erp/asia", () => ({
   simulateSandboxIntegrationJob: vi.fn(),
 }));
 vi.mock("../platform/tenant", () => ({ requireVentureMembership: vi.fn(), requireVentureRole: vi.fn() }));
+vi.mock("../db", () => ({ listVenturesForUser: vi.fn() }));
 
 import * as service from "../erp/service";
 import * as asia from "../erp/asia";
+import { listVenturesForUser } from "../db";
 import { requireVentureMembership, requireVentureRole } from "../platform/tenant";
 import type { TrpcContext } from "../_core/context";
 import { erpRouter } from "./erp";
@@ -87,6 +90,20 @@ describe("operational ERP router", () => {
     vi.mocked(service.listOperationalRecords).mockResolvedValue([]);
     await expect(caller().records.list({ ventureId: 21 })).resolves.toEqual([]);
     expect(requireVentureMembership).toHaveBeenCalledWith(7, 21);
+  });
+  it("returns expanded real-record dashboard posture only inside the authorized venture", async () => {
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "viewer", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.getOperationalDashboard).mockResolvedValue({ taxBudget: { activeTaxPolicies: 1 }, peoplePayroll: { activeEmployees: 1 }, delivery: { activeProjects: 1 }, assetsService: { inServiceAssets: 1 }, portfolio: { controlledDomains: 8 } } as never);
+    await expect(caller().dashboard({ ventureId: 21 })).resolves.toMatchObject({ taxBudget: { activeTaxPolicies: 1 }, peoplePayroll: { activeEmployees: 1 }, delivery: { activeProjects: 1 }, assetsService: { inServiceAssets: 1 }, portfolio: { controlledDomains: 8 } });
+    expect(requireVentureMembership).toHaveBeenCalledWith(7, 21);
+    expect(service.getOperationalDashboard).toHaveBeenCalledWith(21);
+  });
+  it("aggregates portfolio analytics only over ventures accessible to the authenticated caller", async () => {
+    vi.mocked(listVenturesForUser).mockResolvedValue([{ id: 21, name: "Allowed one", role: "portfolio_admin" }, { id: 22, name: "Allowed two", role: "viewer" }] as never);
+    vi.mocked(service.getAccessiblePortfolioDashboard).mockResolvedValue({ totals: { accessibleVentures: 2, operationalRecords: 3 }, ventures: [{ ventureId: 21 }, { ventureId: 22 }] } as never);
+    await expect(caller().portfolioDashboard()).resolves.toMatchObject({ totals: { accessibleVentures: 2 }, ventures: [{ ventureId: 21 }, { ventureId: 22 }] });
+    expect(listVenturesForUser).toHaveBeenCalledWith(7);
+    expect(service.getAccessiblePortfolioDashboard).toHaveBeenCalledWith([{ id: 21, name: "Allowed one", role: "portfolio_admin" }, { id: 22, name: "Allowed two", role: "viewer" }]);
   });
   it("returns and updates reporting-currency policy only inside the authorized venture", async () => {
     vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });

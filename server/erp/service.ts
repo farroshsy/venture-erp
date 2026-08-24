@@ -4,14 +4,24 @@ import {
   erpAuditEvents,
   erpBudgetEnvelopes,
   erpBudgetNodes,
+  erpCompensationComponents,
+  erpCrmOpportunities,
+  erpEmployeeProfiles,
   erpExchangeRates,
+  erpAssets,
   erpInventoryBalances,
   erpInventoryMovements,
   erpJournalLines,
   erpJournals,
   erpLedgerEntries,
+  erpMaintenanceWorkOrders,
   erpMasterRecords,
   erpOperationalRecords,
+  erpPayrollCalendars,
+  erpPayrollRuns,
+  erpProjects,
+  erpProjectTasks,
+  erpServiceRequests,
   erpTaxPolicies,
   erpWorkflowDefinitions,
   erpWorkflowInstances,
@@ -477,13 +487,25 @@ export async function completeWorkflowTask(input: { ventureId: number; workflowT
 }
 
 export async function getOperationalDashboard(ventureId: number) {
-  const [records, budgets, tasks, audits, inventoryBalances, invoiceSettlements] = await Promise.all([
+  const db = await requireDb();
+  const [records, budgets, tasks, audits, inventoryBalances, invoiceSettlements, taxPolicies, employeeProfiles, compensationComponents, payrollCalendars, payrollRuns, projects, projectTasks, assets, maintenanceWorkOrders, serviceRequests, opportunities] = await Promise.all([
     listOperationalRecords({ ventureId }),
     listBudgetEnvelopes(ventureId),
     listWorkflowTasks(ventureId),
     listAuditEvents(ventureId),
     listInventoryBalances(ventureId),
     listInvoiceSettlements(ventureId),
+    db.select().from(erpTaxPolicies).where(eq(erpTaxPolicies.ventureId, ventureId)),
+    db.select().from(erpEmployeeProfiles).where(eq(erpEmployeeProfiles.ventureId, ventureId)),
+    db.select().from(erpCompensationComponents).where(eq(erpCompensationComponents.ventureId, ventureId)),
+    db.select().from(erpPayrollCalendars).where(eq(erpPayrollCalendars.ventureId, ventureId)),
+    db.select().from(erpPayrollRuns).where(eq(erpPayrollRuns.ventureId, ventureId)),
+    db.select().from(erpProjects).where(eq(erpProjects.ventureId, ventureId)),
+    db.select().from(erpProjectTasks).where(eq(erpProjectTasks.ventureId, ventureId)),
+    db.select().from(erpAssets).where(eq(erpAssets.ventureId, ventureId)),
+    db.select().from(erpMaintenanceWorkOrders).where(eq(erpMaintenanceWorkOrders.ventureId, ventureId)),
+    db.select().from(erpServiceRequests).where(eq(erpServiceRequests.ventureId, ventureId)),
+    db.select().from(erpCrmOpportunities).where(eq(erpCrmOpportunities.ventureId, ventureId)),
   ]);
   const byDomain = records.reduce<Record<string, { count: number; total: number; pending: number }>>((result, record) => {
     const entry = result[record.domain] ?? { count: 0, total: 0, pending: 0 };
@@ -508,8 +530,70 @@ export async function getOperationalDashboard(ventureId: number) {
       openPurchaseOrders: records.filter(record => record.domain === "procurement" && record.recordType === "purchase_order" && !["fulfilled", "closed", "cancelled"].includes(record.status)).length,
       fulfilledPurchaseOrders: records.filter(record => record.domain === "procurement" && record.recordType === "purchase_order" && record.status === "fulfilled").length,
     },
+    taxBudget: {
+      activeTaxPolicies: taxPolicies.filter(policy => policy.status === "active").length,
+      draftTaxPolicies: taxPolicies.filter(policy => policy.status === "draft").length,
+      activeBudgets: budgets.filter(budget => budget.status === "active").length,
+      committedBudgetAmount: budgets.reduce((total, budget) => total + Number(budget.committedAmount), 0),
+      spentBudgetAmount: budgets.reduce((total, budget) => total + Number(budget.spentAmount), 0),
+    },
+    peoplePayroll: {
+      activeEmployees: employeeProfiles.filter(profile => profile.status === "active").length,
+      activeCompensationComponents: compensationComponents.filter(component => component.status === "active").length,
+      payrollCalendars: payrollCalendars.length,
+      payrollRuns: payrollRuns.length,
+      reviewablePayrollRuns: payrollRuns.filter(run => ["draft", "review", "approved"].includes(run.status)).length,
+    },
+    delivery: {
+      activeProjects: projects.filter(project => project.status === "active").length,
+      activeTasks: projectTasks.filter(task => ["ready", "in_progress", "blocked"].includes(task.status)).length,
+      blockedTasks: projectTasks.filter(task => task.status === "blocked").length,
+    },
+    assetsService: {
+      inServiceAssets: assets.filter(asset => asset.status === "in_service").length,
+      activeMaintenance: maintenanceWorkOrders.filter(workOrder => ["scheduled", "in_progress"].includes(workOrder.status)).length,
+      openServiceRequests: serviceRequests.filter(request => !["resolved", "closed", "cancelled"].includes(request.status)).length,
+      activeOpportunities: opportunities.filter(opportunity => ["qualified", "proposal", "negotiation"].includes(opportunity.stage)).length,
+    },
+    portfolio: {
+      operationalRecords: records.length,
+      auditedEvents: audits.length,
+      controlledDomains: new Set([...records.map(record => record.domain), ...(employeeProfiles.length ? ["people"] : []), ...(projects.length ? ["projects"] : []), ...(assets.length ? ["assets"] : []), ...(serviceRequests.length ? ["service"] : []), ...(opportunities.length ? ["crm"] : [])]).size,
+    },
     work: Object.fromEntries(["people", "projects", "assets", "service", "crm"].map(domain => [domain, records.filter(record => record.domain === domain && !["closed", "cancelled"].includes(record.status)).length])),
     latestAuditEvents: audits.slice(0, 12),
+  };
+}
+
+export async function getAccessiblePortfolioDashboard(ventures: Array<{ id: number; name: string; role: string }>) {
+  const perVenture = await Promise.all(ventures.map(async venture => {
+    const dashboard = await getOperationalDashboard(venture.id);
+    return {
+      ventureId: venture.id,
+      ventureName: venture.name,
+      role: venture.role,
+      operationalRecords: dashboard.portfolio.operationalRecords,
+      auditedEvents: dashboard.portfolio.auditedEvents,
+      openWorkflowTasks: dashboard.openTasks,
+      availableInventory: dashboard.inventory.availableQuantity,
+      receivableOpen: dashboard.finance.receivableOpen,
+      payableOpen: dashboard.finance.payableOpen,
+      activeProjects: dashboard.delivery.activeProjects,
+      inServiceAssets: dashboard.assetsService.inServiceAssets,
+      openServiceRequests: dashboard.assetsService.openServiceRequests,
+    };
+  }));
+  return {
+    ventures: perVenture,
+    totals: perVenture.reduce((total, venture) => ({
+      accessibleVentures: total.accessibleVentures + 1,
+      operationalRecords: total.operationalRecords + venture.operationalRecords,
+      auditedEvents: total.auditedEvents + venture.auditedEvents,
+      openWorkflowTasks: total.openWorkflowTasks + venture.openWorkflowTasks,
+      activeProjects: total.activeProjects + venture.activeProjects,
+      inServiceAssets: total.inServiceAssets + venture.inServiceAssets,
+      openServiceRequests: total.openServiceRequests + venture.openServiceRequests,
+    }), { accessibleVentures: 0, operationalRecords: 0, auditedEvents: 0, openWorkflowTasks: 0, activeProjects: 0, inServiceAssets: 0, openServiceRequests: 0 }),
   };
 }
 

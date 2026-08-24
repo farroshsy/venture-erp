@@ -7,6 +7,7 @@ import * as people from "../erp/people";
 import * as deliveryAssets from "../erp/delivery-assets";
 import * as serviceCrm from "../erp/service-crm";
 import { calculatePayrollProposal } from "../erp/policy";
+import { listVenturesForUser } from "../db";
 
 const ventureInput = z.object({ ventureId: z.number().int().positive() });
 const masterDomains = ["customer", "supplier", "item", "employee", "account", "project", "asset", "location", "compensation_component", "tax_category"] as const;
@@ -28,6 +29,10 @@ async function requireOperationalRole(userId: number, ventureId: number) {
 
 export const erpRouter = router({
   dashboard: protectedProcedure.input(ventureInput).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return erp.getOperationalDashboard(input.ventureId); }),
+  portfolioDashboard: protectedProcedure.query(async ({ ctx }) => {
+    const ventures = await listVenturesForUser(ctx.user.id);
+    return erp.getAccessiblePortfolioDashboard(ventures.map(venture => ({ id: venture.id, name: venture.name, role: venture.role })));
+  }),
   master: router({
     list: protectedProcedure.input(ventureInput.extend({ domain: z.enum(masterDomains).optional() })).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return erp.listMasterRecords(input.ventureId, input.domain); }),
     create: protectedProcedure.input(ventureInput.extend({ domain: z.enum(masterDomains), code: z.string().trim().min(1).max(96), name: z.string().trim().min(1).max(180), attributes: z.record(z.string(), z.unknown()).default({}) })).mutation(async ({ ctx, input }) => { await requireOperationalRole(ctx.user.id, input.ventureId); return erp.createMasterRecord({ ...input, createdByUserId: ctx.user.id }); }),

@@ -48,7 +48,9 @@
 - [x] Implement functional customer, sales-order, procurement-request, purchase-order, supplier, item, inventory movement, and stock-reservation records with transaction-safe state changes.
 - [x] Implement functional employee, compensation component, payroll-run, project, task, asset, maintenance, service request, and CRM opportunity records with jurisdiction-neutral calculation inputs.
 - [x] Implement an automation workbench for configurable event, approval, task, and exception workflows, with a BPMN-style visual process model and auditable state transitions.
-- [ ] Implement operating dashboards for financial posture, tax/budget utilization, supply/inventory, people/payroll, delivery/projects, assets/service, and venture portfolio analytics using real operational records.
+- [x] Implement operating dashboards for financial posture, tax/budget utilization, supply/inventory, people/payroll, delivery/projects, assets/service, and venture portfolio analytics using real operational records.
+- [x] Extend Operational Insights with tenant-scoped real-record measures for tax policy, people/payroll, delivery, assets/service, and portfolio posture; provide responsive domain views and test the aggregation contract.
+- [x] Implement authorized cross-venture portfolio analytics sourced from real operational records, with accessible-venture filtering, focused tenant-scope tests, and responsive UI validation.
 - [x] Define and enforce country/jurisdiction boundaries for tax, payroll, public-sector budgeting, banking, statutory reporting, and external integration automation; do not hardcode legal rates or submit filings.
 - [x] Add end-to-end tests for transactional workflows, automation state transitions, tenant isolation, role permissions, and audit-event creation.
 - [x] Update documentation with the operational ERP architecture, feature coverage, competitor-gap analysis, automation model, compliance boundaries, and phased roadmap to broader parity.
