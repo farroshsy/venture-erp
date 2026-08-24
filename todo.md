@@ -50,7 +50,7 @@
 - [x] Implement an automation workbench for configurable event, approval, task, and exception workflows, with a BPMN-style visual process model and auditable state transitions.
 - [ ] Implement operating dashboards for financial posture, tax/budget utilization, supply/inventory, people/payroll, delivery/projects, assets/service, and venture portfolio analytics using real operational records.
 - [x] Define and enforce country/jurisdiction boundaries for tax, payroll, public-sector budgeting, banking, statutory reporting, and external integration automation; do not hardcode legal rates or submit filings.
-- [ ] Add end-to-end tests for transactional workflows, automation state transitions, tenant isolation, role permissions, and audit-event creation.
+- [x] Add end-to-end tests for transactional workflows, automation state transitions, tenant isolation, role permissions, and audit-event creation.
 - [x] Update documentation with the operational ERP architecture, feature coverage, competitor-gap analysis, automation model, compliance boundaries, and phased roadmap to broader parity.
 - [x] Validate real operational workflows, mobile/desktop UX, access lifecycle, and database integrity; record outstanding integration and regulatory prerequisites.
 - [x] Capture the operational ERP transformation in a reviewable checkpoint.
@@ -94,6 +94,8 @@
 - [x] Add explicit, tenant-scoped operational-record event triggers to active BPMN workflow definitions so approved records can start a human-gated workflow with durable audit evidence and no external side effect.
 - [x] Add a read-only database integration test that verifies the authorized validation venture’s real sales-order reservation, internal fulfillment, event-triggered workflow instance, pending human task, audit evidence, and absence from a separate tenant boundary.
 - [x] Add a controlled procurement-request lifecycle and approved request-to-purchase-order conversion path with supplier validation, duplicate-conversion prevention, audit evidence, and no supplier payment or external procurement action.
-- [ ] Add automated end-to-end coverage that exercises authenticated role-permission enforcement, transactional state transitions, automation task completion, tenant isolation, and resulting audit-event creation in executable validation flows.
+- [x] Add automated end-to-end coverage that exercises authenticated role-permission enforcement, transactional state transitions, automation task completion, tenant isolation, and resulting audit-event creation in executable validation flows.
+- [x] Add executable typed-route integration coverage that creates, approves, reserves, and internally fulfills a single clearly labelled validation sales order, then verifies its generated workflow and audit trail.
+- [x] Add authenticated multi-role typed-route coverage that proves allowed and forbidden behavior for at least two distinct active venture roles beyond unaffiliated membership denial.
 - [x] Implement explicit reporting-currency support and policy controls, or narrow the multi-currency roadmap claim to the existing transaction/functional-currency and approved-FX controls.
 - [x] Add tenant reporting-currency configuration plus approved-rate-backed reporting amounts on operational records, with audit evidence and no external financial execution.

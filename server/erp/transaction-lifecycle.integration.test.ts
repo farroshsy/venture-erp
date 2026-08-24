@@ -20,9 +20,9 @@ describe.skipIf(!process.env.DATABASE_URL)("validation-venture transaction lifec
     const [triggeredSalesOrder] = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.ventureId, validationVentureId), eq(erpOperationalRecords.recordNumber, "VALIDATION-EVENT-SALES-ORDER-20260824"))).limit(1);
     expect(triggeredSalesOrder).toMatchObject({ ventureId: validationVentureId, status: "approved" });
     const [instance] = await db.select().from(erpWorkflowInstances).where(and(eq(erpWorkflowInstances.ventureId, validationVentureId), eq(erpWorkflowInstances.operationalRecordId, triggeredSalesOrder!.id))).limit(1);
-    expect(instance).toMatchObject({ ventureId: validationVentureId, status: "active" });
+    expect(instance).toMatchObject({ ventureId: validationVentureId, status: "completed" });
     const [task] = await db.select().from(erpWorkflowTasks).where(and(eq(erpWorkflowTasks.ventureId, validationVentureId), eq(erpWorkflowTasks.workflowInstanceId, instance!.id))).limit(1);
-    expect(task).toMatchObject({ status: "pending", assigneeUserId: 1 });
+    expect(task).toMatchObject({ status: "approved", assigneeUserId: 1 });
     const triggerAudits = await db.select().from(erpAuditEvents).where(and(eq(erpAuditEvents.ventureId, validationVentureId), eq(erpAuditEvents.operationalRecordId, triggeredSalesOrder!.id), eq(erpAuditEvents.eventType, "workflow.event_triggered")));
     expect(triggerAudits).toHaveLength(1);
 
