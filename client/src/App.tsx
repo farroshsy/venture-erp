@@ -7,7 +7,13 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { VentureProvider } from "./contexts/VentureContext";
 import Architecture from "./pages/Architecture";
+import ArchitectureGovernance from "./pages/ArchitectureGovernance";
+import ArchitectureAssistant from "./pages/ArchitectureAssistant";
+import AsiaOperations from "./pages/AsiaOperations";
+import CrossBorderFinance from "./pages/CrossBorderFinance";
+import AccessAdministration from "./pages/AccessAdministration";
 import DecisionGovernance from "./pages/DecisionGovernance";
+import ExecutiveArchitecture from "./pages/ExecutiveArchitecture";
 import ModuleCatalog from "./pages/ModuleCatalog";
 import OperationsWorkspace from "./pages/OperationsWorkspace";
 import PortfolioDashboard from "./pages/PortfolioDashboard";
@@ -17,8 +23,14 @@ function Router() {
   return (
     <Switch>
       <Route path={"/"} component={PortfolioDashboard} />
+      <Route path={"/executive"} component={ExecutiveArchitecture} />
+      <Route path={"/governance"} component={ArchitectureGovernance} />
+      <Route path={"/assistant"} component={ArchitectureAssistant} />
+      <Route path={"/access"} component={AccessAdministration} />
       <Route path={"/modules"} component={ModuleCatalog} />
       <Route path={"/operations"} component={OperationsWorkspace} />
+      <Route path={"/asia"} component={AsiaOperations} />
+      <Route path={"/cross-border"} component={CrossBorderFinance} />
       <Route path={"/decisions"} component={DecisionGovernance} />
       <Route path={"/architecture"} component={Architecture} />
       <Route path={"/404"} component={NotFound} />

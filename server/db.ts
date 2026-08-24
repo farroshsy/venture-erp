@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, decisionEvidenceReviews, governanceCases, users, ventureMemberships, ventures } from "../drizzle/schema";
+import { InsertUser, assistantMessages, decisionEvidenceReviews, governanceCases, users, ventureMemberships, ventures } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { compileScopedPortfolioGovernance } from "./platform/portfolio";
 
@@ -184,6 +184,26 @@ export const getPortfolioGovernanceForUser = createPortfolioGovernanceQuery({
   listCasesForVenture: listGovernanceCasesForVenture,
 });
 
+export async function getVentureGovernanceComparisonForUser(userId: number) {
+  const ventures = await listVenturesForUser(userId);
+  const casesByVenture = await Promise.all(ventures.map(venture => listGovernanceCasesForVenture(venture.id)));
+  return ventures.map((venture, index) => {
+    const cases = casesByVenture[index] ?? [];
+    const approved = cases.filter(governanceCase => governanceCase.status === "approved").length;
+    const inReview = cases.filter(governanceCase => governanceCase.status === "review" || governanceCase.status === "draft").length;
+    const score = Math.min(100, approved * 35 + inReview * 15);
+    return {
+      ventureId: venture.id,
+      ventureName: venture.name,
+      role: venture.role,
+      approvedDecisions: approved,
+      activeDecisions: inReview,
+      governanceEvidenceScore: score,
+      posture: approved > 0 ? "governed" : inReview > 0 ? "reviewing" : "not-instrumented",
+    };
+  });
+}
+
 export async function createGovernanceCase(input: {
   ventureId: number;
   title: string;
@@ -232,6 +252,38 @@ export async function approveDecisionEvidenceReview(reviewId: number, approverUs
   if (!db) throw new Error("Database is not available.");
   await db.update(decisionEvidenceReviews).set({ status: "approved", approvedByUserId: approverUserId, approvedAt: new Date() }).where(eq(decisionEvidenceReviews.id, reviewId));
   return { success: true, reviewId, status: "approved" as const };
+}
+
+export async function listAssistantMessages(input: { userId: number; ventureId: number; conversationId: string }) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: assistantMessages.id,
+    role: assistantMessages.role,
+    content: assistantMessages.content,
+    evidence: assistantMessages.evidence,
+    model: assistantMessages.model,
+    createdAt: assistantMessages.createdAt,
+  }).from(assistantMessages).where(and(
+    eq(assistantMessages.userId, input.userId),
+    eq(assistantMessages.ventureId, input.ventureId),
+    eq(assistantMessages.conversationId, input.conversationId),
+  )).orderBy(assistantMessages.createdAt);
+}
+
+export async function createAssistantMessage(input: {
+  conversationId: string;
+  userId: number;
+  ventureId: number;
+  role: "user" | "assistant";
+  content: string;
+  evidence: unknown;
+  model?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available.");
+  const result = await db.insert(assistantMessages).values(input);
+  return { id: Number(result[0].insertId), ...input, createdAt: new Date() };
 }
 
 export { decisionEvidenceReviews, governanceCases };

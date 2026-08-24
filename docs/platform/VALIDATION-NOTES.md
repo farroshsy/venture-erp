@@ -15,3 +15,63 @@ The managed schema was queried after migration. The required physical tables are
 ### Responsive visual checks
 
 The Portfolio, Operations, Decision Governance, and Architecture routes were captured at 375×812, 768×1024, and 1440×1000. The mobile view collapses the desktop shell into a compact top bar and stacks all dense workspace panels without horizontal clipping. The tablet view preserves readable decision criteria, domain controls, and architecture stages in a single-column layout. The desktop view uses the full workspace grid, side navigation, and two-column decision/architecture compositions. No navigation overlap, clipped text, or unsafe horizontal overflow was observed in the captured routes.
+
+## 2026-08-23 — Enterprise control-plane upgrade validation
+
+The executive architecture dashboard, architecture governance portal, platform catalog, architecture assistant, and access-administration workspace were captured at 1440×1000 and 375×812. At desktop size, the executive scorecard, catalog density, ADR timeline, engineering governance register, assistant policy boundary, and access-administration empty state rendered with the intended hierarchy. At the mobile breakpoint, each workspace reduced to a readable single-column sequence without horizontal clipping. The assistant and access screens correctly exposed a safe “select a venture” posture when no tenant had been created.
+
+The complete local quality suite passed: TypeScript checking, all 23 Vitest tests, public contract validation, foundation verification, and the production build. Focused tests cover assistant membership scope, bounded conversation persistence, IAM authorization refusal, reviewable access-request creation, role/permission logic, distinct revoke-versus-suspend behavior, ADR/catalog linkage, truthful KPI posture, and prior tenant-isolation paths. The managed database was queried after the migration; `platform_roles`, `platform_permissions`, `platform_role_permissions`, `platform_access_assignments`, `access_change_requests`, and `assistant_messages` are all present.
+
+One build advisory remains: the generated JavaScript bundle exceeds the default 500 kB warning threshold. It does not block the current build, but the roadmap should introduce route-level code splitting before the platform acquires additional operational dashboards or external integrations.
+
+### Access lifecycle validation note
+
+The Access Administration route was re-captured after grant, suspend, revoke, and portfolio/venture/module scope controls were added. Its desktop and mobile no-venture state correctly blocks assignment administration until a real tenant is selected, preserving the membership-first guardrail. The API and service tests cover grant, suspend, and revoke request creation plus distinct suspend/revoke effects. A browser walkthrough of the populated form and approval queue requires a real venture and member, which have not been created to avoid introducing unsolicited test data into the user’s workspace.
+
+## 2026-08-24 — Asia sandbox job milestone
+
+The Asia Operations API now exposes tenant-scoped sandbox job listing, queueing, and simulation routes. Queueing accepts an optional active BPMN workflow definition and operational-record reference, while simulation remains an evidence-only operation with no external transmission path. The expanded router suite passes with 34 tests, including a finance-lead queue request linked to a workflow definition and operational record.
+
+During the latest live-preview diagnostic, the managed development server returned the root document and unauthenticated `auth.me` RPC normally after restart. However, the authenticated My Browser preview remained on the application loading shell and did not issue its expected application RPC calls. This is recorded as an outstanding browser-session/preview validation blocker; it does not invalidate the successful TypeScript check or unit coverage, but the refreshed desktop and mobile screenshots must be captured after the authenticated preview recovers.
+
+### Physical schema verification
+
+The initial direct schema commands timed out under TiDB Serverless despite being additive. A longer-lived, idempotent migration run then completed successfully. Read-only verification confirmed the nullable `erp_operational_records.publicBudgetNodeId` column and the complete `erp_integration_jobs` table, including its primary key and six tenant/reference foreign keys. The source migrations now use the corresponding short, MySQL/TiDB-safe foreign-key names for reproducible fresh environments.
+
+### Cross-border workspace validation
+
+The managed preview successfully rendered both the Asia Operations and Cross-Border Finance workspaces for `RBAC Validation Venture — 2026-08-23`. The persisted currency reference contained the eight supported Asia rollout currencies, and the cross-border form visibly presented transaction currency, functional currency, approved-rate, public-budget, accounting-period, and actual-record register controls.
+
+In the authenticated browser walkthrough, a clearly labelled validation-only IDR/USD draft FX record was created after discovering that the exchange form’s internal default target was `USD` while the select rendered the first supported currency. It remains a **draft** and is explicitly not a market, tax, or filing rate. The default was immediately corrected in code to `CNY`, a supported rollout currency, before proceeding with further cross-border validation. No payment, filing, transfer, or statutory submission was initiated.
+
+After reload, the Asia Operations screen loaded the persisted eight-currency profile list and displayed the intentionally unapproved validation-only draft record. The page continued to show zero approved FX rates, zero public budget nodes, and zero sandbox adapters, confirming that no operational payment, filing, or external connector capability has been enabled by this validation work.
+
+The corrected validation-only **IDR/CNY** draft was then approved through the venture-scoped control. The Asia summary increased to one approved FX rate while sandbox adapters remained zero. The older IDR/USD validation draft remains unapproved; it was not selected for any cross-border workflow.
+
+The real tenant-scoped service path was exercised against the migrated database using a minimally scoped, clearly named validation-only CNY public-budget node and cross-border record. The persisted record `VALIDATION-CB-IDR-CNY-20260824` is a draft finance record with transaction currency `IDR`, functional currency `CNY`, approved exchange-rate reference `30001`, calculated functional amount `45.00`, and public-budget node `1`. Its payload explicitly records `noPayment: true` and `noFiling: true`; no payment, transfer, tax filing, or statutory submission was created.
+
+### Venture-scoped country-pack enforcement
+
+Pack-dependent payroll calendars, payroll runs, and public-budget nodes now require both a globally approved pack and an active selection for the same venture and purpose. Focused service tests prove that an approved-but-unselected pack is rejected for both payroll and public-budget configuration, while the router suite proves that a public-budget pack reference is only forwarded through the finance-authorized venture route. The focused suite passed with 43 tests after this enforcement change.
+
+The enforcement proof was then expanded to 46 passing tests. Service coverage rejects a selection object from a different venture as defense in depth, while router coverage verifies that both public-budget and payroll mutations surface an active-selection rejection through the tenant-scoped contract. This provides a positive enforcement boundary without treating a globally approved pack as automatically applicable to every venture.
+
+### Sandbox adapter and job lifecycle
+
+The real sandbox service path was exercised in the authorized validation venture using an explicitly named, credential-free validation adapter. Its health simulation gate was invoked before a job was queued against the validation cross-border record. The persisted job reached `simulated` with response evidence `simulationOutcome: accepted`, `simulationOnly: true`, and `externalTransmission: false`. It has no workflow instance because this proof intentionally validated the direct queued-to-simulated sandbox branch; no provider endpoint, banking action, transfer, filing, statutory report, or credential was used.
+
+The browser-rendered sandbox form clearly stated that credentials are not stored and production needs a separate review. Its interactive submit did not visibly refresh the connection list during the automated click, so the service-level validation was used to isolate the contract and state-machine proof; this remains a UI-walkthrough observation for final responsive validation, not a claim that production integration is available.
+
+### Post-restart live UI verification
+
+After a clean development-server restart, authenticated live requests returned the correct venture-scoped FX, public-budget, operational-record, sandbox-connection, and sandbox-job lists. The Asia Operations summary rendered one approved FX rate and one sandbox adapter. The Cross-Border Finance page rendered the approved IDR/CNY evidence, the active CNY public-budget node, and the validation-only record with its saved IDR-to-CNY conversion, rate reference, functional amount, and draft status.
+
+### Approval-gated sandbox evidence
+
+The linked approval branch was also exercised in the same validation venture. The active workflow `VALIDATION_SANDBOX_APPROVAL_20260824` created an internal approval task for sandbox job `30001`; the task was approved before the job was simulated. The final job persisted `workflowInstanceId: 1`, `status: simulated`, `simulationOnly: true`, `externalTransmission: false`, and `simulationOutcome: accepted`. This validates the BPMN-style approval gate without contacting a provider or initiating any financial, tax, payroll, or statutory action.
+
+### Final quality gate and responsive review
+
+The final quality gate passed after all schema, service, router, UI, and documentation changes: TypeScript check, 46-unit-test suite, eight integration tests, contract validation, foundation verification, and production build. The responsive 375px captures rendered both Asia Operations and Cross-Border Finance without clipped controls or horizontal overflow. The production build emitted a chunk-size advisory for the main client bundle; this is a performance follow-up, not a build failure.
+
+No end-to-end statutory payroll calculation was created because the validation venture has no reviewed and actively selected payroll jurisdiction pack. That is an intentional production prerequisite, not a missing bypass: a qualified local reviewer must supply an effective-dated, source-linked pack before the platform may rehearse a pack-dependent payroll run.

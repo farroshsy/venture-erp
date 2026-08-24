@@ -43,6 +43,11 @@ export type PlatformModule = {
   description: string;
   dependencies: string[];
   evidence: ServiceEvidence;
+  businessCapability?: string;
+  lifecycle?: "planned" | "incubating" | "operational" | "strategic";
+  securityPosture?: "reviewed" | "in-review" | "not-started";
+  runbookStatus?: "available" | "planned" | "missing";
+  adrIds?: string[];
 };
 
 export type ServiceMaturityResult = {
@@ -71,3 +76,35 @@ export const decisionCriterionLabels: Record<DecisionCriterionKey, string> = {
 
 export const decisionPaths = ["sap", "alternative", "custom"] as const;
 export type DecisionPath = (typeof decisionPaths)[number];
+
+export const platformPermissionKeys = [
+  "architecture.view",
+  "architecture.review",
+  "catalog.manage",
+  "assistant.query",
+  "governance.view",
+  "governance.manage",
+  "iam.view",
+  "iam.manage",
+  "module.finance.manage",
+  "module.procurement.manage",
+  "module.inventory.manage",
+  "module.people.manage",
+  "module.projects.manage",
+] as const;
+
+export type PlatformPermissionKey = (typeof platformPermissionKeys)[number];
+export type PlatformAccessScope = "portfolio" | "venture" | "module";
+
+export type ArchitectureDecision = {
+  id: string;
+  title: string;
+  status: "accepted" | "proposed" | "superseded";
+  decidedAt: string;
+  owner: string;
+  contexts: string[];
+  impact: "high" | "medium" | "low";
+  reviewStatus: "approved" | "scheduled" | "monitoring";
+  rejectedAlternatives: string[];
+  summary: string;
+};

@@ -1,0 +1,144 @@
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("../erp/service", () => ({
+  listOperationalRecords: vi.fn(),
+  createOperationalRecord: vi.fn(),
+  getOperationalDashboard: vi.fn(),
+  listMasterRecords: vi.fn(),
+  createMasterRecord: vi.fn(),
+  listAccountingPeriods: vi.fn(),
+  createAccountingPeriod: vi.fn(),
+  listTaxPolicies: vi.fn(),
+  createTaxPolicy: vi.fn(),
+  activateTaxPolicy: vi.fn(),
+  listBudgetEnvelopes: vi.fn(),
+  createBudgetEnvelope: vi.fn(),
+  activateBudgetEnvelope: vi.fn(),
+  transitionOperationalRecord: vi.fn(),
+  createLedgerEntry: vi.fn(),
+  listWorkflowDefinitions: vi.fn(),
+  createWorkflowDefinition: vi.fn(),
+  activateWorkflowDefinition: vi.fn(),
+  startWorkflow: vi.fn(),
+  listWorkflowTasks: vi.fn(),
+  completeWorkflowTask: vi.fn(),
+  listAuditEvents: vi.fn(),
+}));
+vi.mock("../erp/asia", () => ({
+  ASIA_CURRENCY_REFERENCE: [],
+  listJurisdictionPacks: vi.fn(),
+  createJurisdictionPack: vi.fn(),
+  reviewJurisdictionPack: vi.fn(),
+  listVentureJurisdictionSelections: vi.fn(),
+  selectJurisdictionPack: vi.fn(),
+  listCurrencyProfiles: vi.fn(),
+  listExchangeRates: vi.fn(),
+  createExchangeRate: vi.fn(),
+  approveExchangeRate: vi.fn(),
+  listBudgetNodes: vi.fn(),
+  createBudgetNode: vi.fn(),
+  activateBudgetNode: vi.fn(),
+  listPayrollCalendars: vi.fn(),
+  createPayrollCalendar: vi.fn(),
+  activatePayrollCalendar: vi.fn(),
+  listPayrollRuns: vi.fn(),
+  createPayrollRun: vi.fn(),
+  submitPayrollRunForApproval: vi.fn(),
+  approvePayrollRun: vi.fn(),
+  listIntegrationConnections: vi.fn(),
+  createSandboxIntegration: vi.fn(),
+  testSandboxIntegration: vi.fn(),
+  listIntegrationJobs: vi.fn(),
+  queueSandboxIntegrationJob: vi.fn(),
+  simulateSandboxIntegrationJob: vi.fn(),
+}));
+vi.mock("../platform/tenant", () => ({ requireVentureMembership: vi.fn(), requireVentureRole: vi.fn() }));
+
+import * as service from "../erp/service";
+import * as asia from "../erp/asia";
+import { requireVentureMembership, requireVentureRole } from "../platform/tenant";
+import type { TrpcContext } from "../_core/context";
+import { erpRouter } from "./erp";
+
+function caller() {
+  return erpRouter.createCaller({ user: { id: 7, openId: "operator", email: "operator@example.com", name: "Operator", loginMethod: "manus", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: {} as TrpcContext["res"] });
+}
+
+describe("operational ERP router", () => {
+  it("requires venture membership before returning operational records", async () => {
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "viewer", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.listOperationalRecords).mockResolvedValue([]);
+    await expect(caller().records.list({ ventureId: 21 })).resolves.toEqual([]);
+    expect(requireVentureMembership).toHaveBeenCalledWith(7, 21);
+  });
+  it("requires an operational role before creating a transaction", async () => {
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "viewer", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(requireVentureRole).mockImplementation(() => { throw new Error("FORBIDDEN"); });
+    await expect(caller().records.create({ ventureId: 21, domain: "sales", recordType: "sales_order", recordNumber: "SO-1", title: "Test order", amount: 100, effectiveDate: "2026-08-23", data: {} })).rejects.toThrow("FORBIDDEN");
+    expect(service.createOperationalRecord).not.toHaveBeenCalled();
+  });
+  it("forwards cross-border currency and public-budget evidence only after tenant role authorization", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.createOperationalRecord).mockResolvedValue({ id: 33, functionalAmount: 150, status: "draft" } as never);
+    await expect(caller().records.create({ ventureId: 21, domain: "finance", recordType: "cross_border_invoice", recordNumber: "CB-1", title: "Cross-border proof", amount: 100, transactionCurrency: "IDR", functionalCurrency: "SGD", exchangeRateId: 44, publicBudgetNodeId: 8, effectiveDate: "2026-08-24", data: { crossBorder: true } })).resolves.toMatchObject({ id: 33, functionalAmount: 150 });
+    expect(service.createOperationalRecord).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, transactionCurrency: "IDR", functionalCurrency: "SGD", exchangeRateId: 44, publicBudgetNodeId: 8, createdByUserId: 7 }));
+  });
+  it("forwards a selected public-budget jurisdiction pack only through a finance-authorized venture route", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(asia.createBudgetNode).mockResolvedValue({ id: 8, jurisdictionPackId: 9, status: "draft" } as never);
+    await caller().asia.publicBudget.create({ ventureId: 21, jurisdictionPackId: 9, level: "agency", code: "PUBLIC-TEST", name: "Public budget validation", currency: "IDR", appropriatedAmount: 100, attributes: {} });
+    expect(asia.createBudgetNode).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, jurisdictionPackId: 9, createdByUserId: 7 }));
+  });
+  it("surfaces public-budget pack applicability rejection through the tenant-scoped API", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(asia.createBudgetNode).mockRejectedValue(new Error("An active public budget jurisdiction-pack selection is required in the active venture."));
+    await expect(caller().asia.publicBudget.create({ ventureId: 21, jurisdictionPackId: 99, level: "agency", code: "PUBLIC-DENIED", name: "Denied public budget", currency: "IDR", appropriatedAmount: 100, attributes: {} })).rejects.toThrow("An active public budget jurisdiction-pack selection is required in the active venture.");
+  });
+  it("surfaces payroll pack applicability rejection through the tenant-scoped API", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(asia.createPayrollCalendar).mockRejectedValue(new Error("An active payroll jurisdiction-pack selection is required in the active venture."));
+    await expect(caller().asia.payroll.createCalendar({ ventureId: 21, jurisdictionPackId: 99, code: "PAYROLL-DENIED", name: "Denied payroll", cadence: "monthly", workerCategory: "employee", currency: "IDR" })).rejects.toThrow("An active payroll jurisdiction-pack selection is required in the active venture.");
+  });
+  it("refuses a cross-border create request from a caller without an operational venture role", async () => {
+    vi.mocked(service.createOperationalRecord).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "viewer", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(requireVentureRole).mockImplementation(() => { throw new Error("FORBIDDEN"); });
+    await expect(caller().records.create({ ventureId: 21, domain: "finance", recordType: "cross_border_invoice", recordNumber: "CB-DENIED", title: "Denied cross-border proof", amount: 100, transactionCurrency: "IDR", functionalCurrency: "SGD", exchangeRateId: 44, publicBudgetNodeId: 8, effectiveDate: "2026-08-24", data: { crossBorder: true } })).rejects.toThrow("FORBIDDEN");
+    expect(service.createOperationalRecord).not.toHaveBeenCalled();
+  });
+  it("requires an active venture role before a country pack can be created", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(asia.createJurisdictionPack).mockResolvedValue({ id: 9, countryCode: "SG", status: "draft" } as never);
+    await caller().asia.jurisdiction.create({ ventureId: 21, countryCode: "SG", version: "0.1.0", name: "Singapore draft", effectiveFrom: "2026-01-01", sourceLinks: ["https://www.iras.gov.sg/"], configuration: {}, testEvidence: {} });
+    expect(requireVentureMembership).toHaveBeenCalledWith(7, 21);
+    expect(asia.createJurisdictionPack).toHaveBeenCalledWith(expect.objectContaining({ countryCode: "SG", createdByUserId: 7 }));
+  });
+  it("accepts only a declared sandbox adapter request through the governed route", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(asia.createSandboxIntegration).mockResolvedValue({ id: 4, mode: "sandbox", status: "configured" } as never);
+    const result = await caller().asia.integration.configureSandbox({ ventureId: 21, adapterFamily: "banking", provider: "Bank sandbox", contractVersion: "v1", configuration: {} });
+    expect(result).toMatchObject({ mode: "sandbox" });
+    expect(asia.createSandboxIntegration).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, adapterFamily: "banking", createdByUserId: 7 }));
+  });
+  it("queues a sandbox-only adapter job with an optional BPMN approval reference", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(asia.queueSandboxIntegrationJob).mockResolvedValue({ id: 14, status: "awaiting_approval", workflowInstanceId: 90, simulated: true } as never);
+    const result = await caller().asia.integration.queueJob({ ventureId: 21, integrationConnectionId: 4, workflowDefinitionId: 3, operationalRecordId: 8, requestPayload: { purpose: "banking evidence" } });
+    expect(result).toMatchObject({ status: "awaiting_approval", simulated: true });
+    expect(asia.queueSandboxIntegrationJob).toHaveBeenCalledWith(expect.objectContaining({ integrationConnectionId: 4, workflowDefinitionId: 3, operationalRecordId: 8, createdByUserId: 7 }));
+  });
+  it("submits a calculated payroll proposal to the separate-reviewer approval stage", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(asia.submitPayrollRunForApproval).mockResolvedValue({ payrollRunId: 6, status: "pending_approval" } as never);
+    await expect(caller().asia.payroll.submitRun({ ventureId: 21, payrollRunId: 6 })).resolves.toMatchObject({ status: "pending_approval" });
+    expect(asia.submitPayrollRunForApproval).toHaveBeenCalledWith({ ventureId: 21, payrollRunId: 6, actorUserId: 7 });
+  });
+});

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { createVentureWithOwner, getPortfolioGovernanceForUser, listVenturesForUser } from "../db";
-import { getModuleCatalog } from "../platform/catalog";
+import { createVentureWithOwner, getPortfolioGovernanceForUser, getVentureGovernanceComparisonForUser, listVenturesForUser } from "../db";
+import { getArchitectureGovernance, getEnterpriseCatalog, getExecutiveArchitectureProjection } from "../platform/enterprise";
 import { requireVentureMembership } from "../platform/tenant";
 import { protectedProcedure, router } from "../_core/trpc";
 
@@ -14,6 +14,7 @@ const createVentureInput = z.object({
 type PlatformRouterDependencies = {
   listVenturesForUser: typeof listVenturesForUser;
   getPortfolioGovernanceForUser: typeof getPortfolioGovernanceForUser;
+  getVentureGovernanceComparisonForUser: typeof getVentureGovernanceComparisonForUser;
   createVentureWithOwner: typeof createVentureWithOwner;
 };
 
@@ -31,8 +32,13 @@ export function createPlatformRouter(dependencies: PlatformRouterDependencies) {
         routingPolicy: "contract-gated",
         tenantPropagation: "gateway-resolved venture membership",
       },
-      modules: getModuleCatalog(),
+      modules: getEnterpriseCatalog(),
     })),
+    executiveDashboard: protectedProcedure.query(async ({ ctx }) => ({
+      ...getExecutiveArchitectureProjection(),
+      ventureMaturity: await dependencies.getVentureGovernanceComparisonForUser(ctx.user.id),
+    })),
+    architectureGovernance: protectedProcedure.query(() => getArchitectureGovernance()),
     validateVentureContext: protectedProcedure
       .input(z.object({ ventureId: z.number().int().positive() }))
       .query(async ({ ctx, input }) => requireVentureMembership(ctx.user.id, input.ventureId)),
@@ -42,5 +48,6 @@ export function createPlatformRouter(dependencies: PlatformRouterDependencies) {
 export const platformRouter = createPlatformRouter({
   listVenturesForUser,
   getPortfolioGovernanceForUser,
+  getVentureGovernanceComparisonForUser,
   createVentureWithOwner,
 });

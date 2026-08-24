@@ -26,4 +26,50 @@
 - [x] Run type checking, tests, database migration verification, and responsive visual checks; resolve all issues found.
 - [x] Capture and review the portfolio, operations, decision, and architecture routes at mobile, tablet, and desktop breakpoints; record the results.
 - [x] Verify the persisted responsive-validation findings in `docs/platform/VALIDATION-NOTES.md` before the completion checkpoint.
-- [ ] Capture the completed implementation in a single reviewable project checkpoint.
+- [x] Capture the completed implementation in a single reviewable project checkpoint.
+- [x] Assess the attached enterprise-platform requirements and document the selected scope, rejected alternatives, and delivery trade-offs.
+- [x] Create an executive architecture dashboard with platform KPIs, venture maturity comparison, service scorecards, ADR status, lifecycle, extraction readiness, ownership, and operational-health views.
+- [x] Create an interactive ADR governance workspace with timeline, linked contexts/services, impact metadata, rejected alternatives, review status, and architecture evolution view.
+- [x] Expand the service catalog into a platform catalog with business capability, contracts, dependencies, health, security posture, runbook, ADR, lifecycle, and extraction-readiness metadata.
+- [x] Implement a policy-constrained architecture assistant chat interface for venture-scoped platform knowledge, ADR exploration, dependency explanation, documentation search, risk prompts, and build-versus-buy guidance.
+- [x] Implement RBAC administration UI and backend controls for venture and module permissions, delegated administration boundaries, approval-ready changes, and access-review visibility.
+- [x] Define the enterprise IAM evolution path for organization hierarchy and ABAC without prematurely implementing an unsafe identity rewrite.
+- [x] Add platform governance views for technical debt, risks, architecture reviews, standards, roadmap, engineering scorecards, and future RFC workflow seams.
+- [x] Add focused tests for assistant scope enforcement, permission changes, role authorization, ADR/catalog filtering, and dashboard aggregations.
+- [x] Document the platform upgrade rationale, repository-evolution plan, operational costs, migration path, rollback posture, and multi-year roadmap.
+- [x] Validate the enterprise dashboards, assistant, RBAC UI, tenant security, and responsive behavior; resolve issues found.
+- [x] Implement distinct revoke and suspend effects for scoped assignments, add focused proof, and re-run RBAC validation.
+- [ ] Add grant, suspend, and revoke request controls plus portfolio, venture, and module scope selection to the access-administration UI; visually validate the complete access-change lifecycle.
+- [ ] Create a clearly labeled validation venture and use it only to verify authorized grant, suspend, and revoke access workflows without fabricating broader operational records.
+- [x] Assess the referenced competitor and classify its capabilities into immediately buildable ERP workflows, integration-dependent features, and regulated or jurisdiction-specific controls.
+- [ ] Define an operational ERP coverage matrix across general ledger, tax configuration, budgets, sales, procurement, inventory, people, payroll, projects, assets, service, CRM, analytics, supply chain, manufacturing, integrations, and IoT-adjacent telemetry.
+- [x] Implement a shared ERP operational core with venture-scoped master data, accounting periods, configurable tax policies, budget envelopes, audit events, approval policies, and BPMN-style workflow definitions.
+- [ ] Implement functional general-ledger journals, account structure, period controls, receivables, payables, and invoice-to-payment workflow records.
+- [ ] Implement functional customer, sales-order, procurement-request, purchase-order, supplier, item, inventory movement, and stock-reservation records with transaction-safe state changes.
+- [ ] Implement functional employee, compensation component, payroll-run, project, task, asset, maintenance, service request, and CRM opportunity records with jurisdiction-neutral calculation inputs.
+- [ ] Implement an automation workbench for configurable event, approval, task, and exception workflows, with a BPMN-style visual process model and auditable state transitions.
+- [ ] Implement operating dashboards for financial posture, tax/budget utilization, supply/inventory, people/payroll, delivery/projects, assets/service, and venture portfolio analytics using real operational records.
+- [x] Define and enforce country/jurisdiction boundaries for tax, payroll, public-sector budgeting, banking, statutory reporting, and external integration automation; do not hardcode legal rates or submit filings.
+- [ ] Add end-to-end tests for transactional workflows, automation state transitions, tenant isolation, role permissions, and audit-event creation.
+- [x] Update documentation with the operational ERP architecture, feature coverage, competitor-gap analysis, automation model, compliance boundaries, and phased roadmap to broader parity.
+- [ ] Validate real operational workflows, mobile/desktop UX, access lifecycle, and database integrity; record outstanding integration and regulatory prerequisites.
+- [ ] Capture the operational ERP transformation in a reviewable checkpoint.
+- [ ] Capture the completed enterprise-platform upgrade in a reviewable checkpoint.
+- [x] Define the Asia jurisdiction-pack strategy for Indonesia, Singapore, Malaysia, Japan, South Korea, China, Taiwan, and Hong Kong, including a no-hardcoded-law policy and specialist validation gates.
+- [x] Define the public-sector budgeting model for national, provincial/state, municipal/local, and agency/program levels without representing a jurisdiction-specific appropriation rule as universal.
+- [ ] Add multi-currency reference data and monetary policy controls for Asian operating currencies, transaction currency, functional currency, reporting currency, and controlled exchange-rate sources.
+- [x] Add configurable payroll calendars, worker categories, compensation components, withholding inputs, and country-pack eligibility controls without claiming statutory compliance until a reviewed pack is activated.
+- [x] Add a sandbox integration registry and adapter contracts for banking, attendance, e-invoicing, POS, tax-filing, and statutory-reporting providers without connecting a live financial or government account.
+- [x] Implement multi-currency accounting, controlled exchange-rate conversion, public-sector budget hierarchy, payroll-run records, and country-pack applicability checks.
+- [x] Implement sandbox adapter simulations, integration health, approval controls, audit evidence, and BPMN workflow hooks for the selected operational processes.
+- [x] Research and document authoritative jurisdictional sources, supported integration prerequisites, pack ownership, legal-review gates, and country rollout sequencing.
+- [ ] Validate multi-currency, payroll, budget, sandbox integration, BPMN, tenant-isolation, and role controls; record all production prerequisites.
+- [ ] Capture the Asia-ready ERP upgrade in a reviewable checkpoint.
+- [x] Add focused service and router proof that operational-record creation requires approved FX evidence, persists functional amounts, and validates public-budget-node tenancy.
+- [x] Validate a minimally scoped cross-border record against the migrated database and record transaction currency, functional currency, approved rate, functional amount, and public-budget linkage evidence.
+- [x] Enforce active venture-scoped country-pack applicability for pack-dependent payroll and public-budget workflows, rather than accepting a globally approved pack alone.
+- [x] Add focused service and router proof that unselected or wrong-venture country packs are rejected for payroll and other pack-governed workflows.
+- [x] Add router-level negative country-pack tests proving payroll and public-budget mutations surface unselected or wrong-venture pack applicability rejection.
+- [x] Add explicit service proof that a jurisdiction-pack selection belonging to another venture is rejected for pack-dependent payroll and public-budget workflows.
+- [ ] Rehearse a pack-dependent payroll run only after a qualified local reviewer supplies an effective-dated, source-linked, reviewed and actively selected payroll pack for an authorized venture.
+- [ ] Reduce the main client bundle through route-level code splitting before a broad production rollout.

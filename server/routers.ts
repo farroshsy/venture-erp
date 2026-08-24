@@ -4,6 +4,9 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { platformRouter } from "./routers/platform";
 import { governanceRouter } from "./routers/governance";
+import { assistantRouter } from "./routers/assistant";
+import { iamRouter } from "./routers/iam";
+import { erpRouter } from "./routers/erp";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -20,6 +23,9 @@ export const appRouter = router({
   }),
   platform: platformRouter,
   governance: governanceRouter,
+  assistant: assistantRouter,
+  iam: iamRouter,
+  erp: erpRouter,
 });
 
 export type AppRouter = typeof appRouter;

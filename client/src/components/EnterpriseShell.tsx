@@ -3,14 +3,20 @@ import { startLogin } from "@/const";
 import { useVenture } from "@/contexts/VentureContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Boxes, ChevronDown, GitBranch, Grid2X2, Landmark, LogOut, Network, PanelLeftClose, PanelLeftOpen, Scale, ShieldCheck, Workflow } from "lucide-react";
+import { ArrowRightLeft, Boxes, ChevronDown, GitBranch, Globe2, Grid2X2, KeyRound, Landmark, LayoutDashboard, LogOut, MessageSquareText, Network, PanelLeftClose, PanelLeftOpen, Scale, ScrollText, ShieldCheck, Workflow } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
 const navigation = [
   { path: "/", label: "Portfolio", icon: Grid2X2 },
+  { path: "/executive", label: "Executive architecture", icon: LayoutDashboard },
+  { path: "/governance", label: "Architecture governance", icon: ScrollText },
+  { path: "/assistant", label: "Architecture assistant", icon: MessageSquareText },
+  { path: "/access", label: "Access administration", icon: KeyRound },
   { path: "/modules", label: "Module catalog", icon: Boxes },
   { path: "/operations", label: "Operations", icon: Workflow },
+  { path: "/asia", label: "Asia operations", icon: Globe2 },
+  { path: "/cross-border", label: "Cross-border finance", icon: ArrowRightLeft },
   { path: "/decisions", label: "Decision governance", icon: Scale },
   { path: "/architecture", label: "Architecture", icon: Network },
 ];

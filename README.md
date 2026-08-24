@@ -6,7 +6,7 @@
 
 ## What is implemented
 
-The delivered workspace includes a venture-scoped portfolio dashboard, an eight-context service catalog, operations panels for Finance, Procurement, Inventory, People, and Project Operations, a build-versus-buy workbench, and an architecture handbook. It persists ventures, memberships, governance cases, and AI evidence-review drafts in the database. It also contains the first versioned public contract, ADRs, service maturity scorecards, contract validation, CI quality gates, and tenant-isolation integration tests.
+The delivered workspace includes a venture-scoped portfolio dashboard, an executive architecture dashboard, interactive architecture governance, a full platform service catalog, operations panels for Finance, Procurement, Inventory, People, and Project Operations, a build-versus-buy workbench, an evidence-bounded architecture assistant, and a venture/module access-administration workspace. It persists ventures, memberships, governance cases, AI evidence-review drafts, role templates, permissions, scoped assignments, access-change records, and assistant conversation evidence in the database. It also contains versioned public contracts, ADRs, service maturity scorecards, contract validation, CI quality gates, and tenant-isolation integration tests.
 
 | Capability | Delivered behavior | Boundary or guardrail |
 |---|---|---|
@@ -15,6 +15,10 @@ The delivered workspace includes a venture-scoped portfolio dashboard, an eight-
 | **Initial ERP workspaces** | Provides finance, procurement, inventory, people, and project operating controls. | Domain commands remain scoped to the bounded context and are not allowed to write another context’s database. |
 | **Decision governance** | Scores SAP, alternative ERP, and custom delivery using declared criteria and weights. | The score is transparent decision support, not an automatic procurement recommendation. |
 | **AI evidence review** | Produces a structured summary, assumptions, gaps, and risks from user-supplied evidence. | The server forces `humanApprovalRequired = true`; only authorized people can approve a review. |
+| **Executive architecture dashboard** | Shows platform scorecards, governance evidence by venture, lifecycle, dependencies, technical debt, risks, and readiness. | Metrics without connected delivery/observability sources remain explicitly marked as integration-needed. |
+| **Architecture governance portal** | Projects ADR timeline, context impact, alternatives, technical debt, risk, review, standards, roadmap, and RFC seam. | ADR Markdown remains the durable decision source; the UI does not fabricate code-change linkage. |
+| **Architecture assistant** | Answers venture-scoped platform questions using ADRs, catalog metadata, maturity evidence, and accessible governance records. | Read-only evidence-bound retrieval; it cannot browse the web, act, grant access, or approve a decision. |
+| **Scoped RBAC** | Manages roles, permissions, venture/module assignment requests, approval application, and access-review posture. | Existing membership remains the tenant boundary; ABAC is a documented future evolution, not an unsafe partial claim. |
 | **Delivery controls** | Adds unit, integration, contract, foundation, and CI checks. | A context is not release-independent merely because it has a folder or endpoint. |
 
 ## Why this architecture—not immediate physical microservices
@@ -65,9 +69,11 @@ client/src/
   pages/                  # Portfolio, catalog, operations, decisions, architecture
 
 server/
-  platform/               # Tenant boundary, maturity, catalog, scoped portfolio aggregation
+  platform/               # Tenant boundary, maturity, catalog, executive and governance projections
   governance/             # Decision scoring and AI approval policy
-  routers/                # Typed API contracts for platform and governance contexts
+  assistant/              # Read-only evidence retrieval and model synthesis
+  iam/                    # Roles, permissions, scoped assignment and effective-permission policy
+  routers/                # Typed API contracts for platform, governance, assistant, and IAM contexts
   _core/                  # Managed runtime infrastructure (do not change casually)
 
 drizzle/
@@ -116,6 +122,19 @@ The catalog assigns a maturity level from L0 to L3. A module reaches L3 only aft
 
 The evidence-review assistant receives only the decision case inputs. It summarizes evidence, calls out assumptions and gaps, and drafts a rationale. It does **not** approve decisions, select vendors, or make factual claims beyond the supplied evidence. The server overrides the approval flag regardless of model output. Read [ADR-003](docs/adr/ADR-003-ai-assisted-evidence-review.md) for the full control rationale.
 
+## Enterprise control plane
+
+The control plane is the platform’s engineering and governance operating layer. It is deliberately honest about its sources: catalog and ADR data are governed metadata; venture comparisons are derived from accessible decision records; delivery frequency, MTTR, traces, queues, error budgets, and integration health stay marked **integration-needed** until a source system is connected. This avoids the common failure mode of presenting a polished dashboard that implies operational truth it cannot verify.
+
+| Workspace | Leadership question | Current evidence source | Future integration boundary |
+|---|---|---|---|
+| Executive Architecture | Where is platform risk and maturity investment concentrated? | Catalog evidence, ADR registry, membership-scoped governance cases. | CI/CD, incident, SLO, trace, and delivery systems. |
+| Architecture Governance | Which decisions affect which contexts, and what did we deliberately reject? | ADR registry, declared ownership, maturity evidence. | RFC workflow and repository-change links. |
+| Architecture Assistant | What does the platform evidence say about a venture-specific question? | Venture-scoped governance, ADRs, catalog, and maturity gaps. | Curated documentation index and approved knowledge connectors. |
+| Access Administration | Who can govern a venture or module, and how did access change? | Memberships, roles, permissions, assignments, and access-change records. | Organization hierarchy, service accounts, API clients, ABAC policy evaluation, and audit export. |
+
+Read [Enterprise Platform Implementation Guide](docs/architecture/ENTERPRISE-PLATFORM-IMPLEMENTATION.md), [Control Plane Design](docs/architecture/PLATFORM-CONTROL-PLANE-DESIGN.md), [ADR-007](docs/adr/ADR-007-scoped-rbac-and-abac-evolution.md), and [ADR-008](docs/adr/ADR-008-evidence-bounded-architecture-assistant.md) for rationale, alternatives, operational costs, migration, rollback, production considerations, and multi-year evolution.
+
 ## Further reading
 
 Read the [Executive Architecture Handbook](docs/EXECUTIVE-ARCHITECTURE-HANDBOOK.md) for the operating philosophy, decision framework, transition plan, and governance model. Read [Upgrade Options](docs/architecture/UPGRADE-OPTIONS.md) for the critical comparison that led to the selected architecture.
@@ -125,3 +144,6 @@ Read the [Executive Architecture Handbook](docs/EXECUTIVE-ARCHITECTURE-HANDBOOK.
 [1] [Microsoft Learn — Microservices architecture style](https://learn.microsoft.com/en-us/azure/architecture/guide/architecture-styles/microservices)  
 [2] [Martin Fowler — Microservice Trade-Offs](https://martinfowler.com/articles/microservice-trade-offs.html)  
 [3] [SAP — Clean core extensibility for SAP S/4HANA Cloud](https://www.sap.com/documents/2024/09/20aece06-d87e-0010-bca6-c68f7e60039b.html)
+[4] [NIST — Role Based Access Control](https://csrc.nist.gov/projects/role-based-access-control)  
+[5] [NIST — Attribute Based Access Control](https://csrc.nist.gov/projects/attribute-based-access-control)  
+[6] [NIST SP 800-162 — Guide to Attribute Based Access Control](https://csrc.nist.gov/pubs/sp/800/162/upd2/final)
