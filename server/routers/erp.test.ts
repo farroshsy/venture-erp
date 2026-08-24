@@ -24,6 +24,8 @@ vi.mock("../erp/service", () => ({
   listInventoryMovements: vi.fn(),
   recordInventoryMovement: vi.fn(),
   receivePurchaseOrder: vi.fn(),
+  reserveSalesOrderInventory: vi.fn(),
+  fulfillSalesOrderInventory: vi.fn(),
   listInvoiceSettlements: vi.fn(),
   createInvoiceRecord: vi.fn(),
   createInternalPaymentRecord: vi.fn(),
@@ -132,6 +134,16 @@ describe("operational ERP router", () => {
     vi.mocked(service.receivePurchaseOrder).mockResolvedValue({ purchaseOrderRecordId: 17, inventoryMovementId: 45, status: "fulfilled", finalReceipt: true } as never);
     await expect(caller().inventory.receivePurchaseOrder({ ventureId: 21, purchaseOrderRecordId: 17, itemMasterId: 13, quantity: 2, narrative: "Final receipt", finalReceipt: true })).resolves.toMatchObject({ status: "fulfilled", finalReceipt: true });
     expect(service.receivePurchaseOrder).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, purchaseOrderRecordId: 17, itemMasterId: 13, actorUserId: 7, finalReceipt: true }));
+  });
+  it("forwards order-linked inventory reservation and final fulfillment through tenant sales routes", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "operator", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.reserveSalesOrderInventory).mockResolvedValue({ salesOrderRecordId: 41, inventoryMovementId: 61, availableQuantity: 3 } as never);
+    vi.mocked(service.fulfillSalesOrderInventory).mockResolvedValue({ salesOrderRecordId: 41, issueMovementId: 63, status: "fulfilled", finalFulfillment: true } as never);
+    await expect(caller().sales.reserveInventory({ ventureId: 21, salesOrderRecordId: 41, itemMasterId: 13, quantity: 2, narrative: "Reserve approved order stock" })).resolves.toMatchObject({ inventoryMovementId: 61 });
+    await expect(caller().sales.fulfillInventory({ ventureId: 21, salesOrderRecordId: 41, itemMasterId: 13, quantity: 2, narrative: "Controlled internal fulfillment evidence", finalFulfillment: true })).resolves.toMatchObject({ status: "fulfilled" });
+    expect(service.reserveSalesOrderInventory).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, salesOrderRecordId: 41, itemMasterId: 13, actorUserId: 7 }));
+    expect(service.fulfillSalesOrderInventory).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, salesOrderRecordId: 41, itemMasterId: 13, actorUserId: 7, finalFulfillment: true }));
   });
   it("forwards customer-linked invoice and internal payment evidence through finance-authorized tenant routes", async () => {
     vi.mocked(requireVentureRole).mockReset();

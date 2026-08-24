@@ -90,3 +90,4 @@
 - [x] Allow an authenticated accessible venture to be selected by an optional query parameter so isolated tenant workflows can be opened and reviewed reproducibly without weakening membership checks.
 - [x] Preselect the sole eligible venture member in access-change forms while preserving explicit selection when multiple members are available.
 - [x] Replace the native access-action selector with explicit action controls so grant, suspend, and revoke are keyboard- and browser-automation-reachable in lifecycle reviews.
+- [x] Add a controlled sales-order inventory reservation and fulfillment workflow that requires an approved tenant-scoped sales order, preserves inventory availability invariants, creates audit evidence, and does not execute shipping, billing, or payment.

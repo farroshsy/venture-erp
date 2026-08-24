@@ -333,6 +333,49 @@ export async function receivePurchaseOrder(input: { ventureId: number; purchaseO
   return { purchaseOrderRecordId: purchaseOrder.id, inventoryMovementId: receipt.id, quantity: receipt.quantity, status, finalReceipt: Boolean(input.finalReceipt) };
 }
 
+export async function reserveSalesOrderInventory(input: { ventureId: number; salesOrderRecordId: number; itemMasterId: number; quantity: number; narrative: string; actorUserId: number }) {
+  const db = await requireDb();
+  const rows = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.id, input.salesOrderRecordId), eq(erpOperationalRecords.ventureId, input.ventureId))).limit(1);
+  const salesOrder = rows[0];
+  if (!salesOrder || salesOrder.domain !== "sales" || salesOrder.recordType !== "sales_order") throw new Error("Approved sales order not found in the active venture.");
+  if (!['approved', 'posted'].includes(salesOrder.status)) throw new Error("Sales orders must be approved or posted before inventory can be reserved.");
+  const reservation = await recordInventoryMovement({ ventureId: input.ventureId, itemMasterId: input.itemMasterId, operationalRecordId: salesOrder.id, movementType: "reserve", quantity: input.quantity, narrative: input.narrative, createdByUserId: input.actorUserId });
+  await createAuditEvent({ ventureId: input.ventureId, domain: "sales", operationalRecordId: salesOrder.id, eventType: "sales_order.inventory_reserved", actorUserId: input.actorUserId, payload: { itemMasterId: input.itemMasterId, quantity: reservation.quantity, inventoryMovementId: reservation.id, noExternalFulfillment: true } });
+  return { salesOrderRecordId: salesOrder.id, inventoryMovementId: reservation.id, quantity: reservation.quantity, availableQuantity: reservation.availableQuantity };
+}
+
+export async function fulfillSalesOrderInventory(input: { ventureId: number; salesOrderRecordId: number; itemMasterId: number; quantity: number; narrative: string; finalFulfillment?: boolean; actorUserId: number }) {
+  const db = await requireDb();
+  const quantity = Math.round(input.quantity * 1000) / 1000;
+  if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Fulfillment quantity must be greater than zero.");
+  if (!input.narrative.trim()) throw new Error("Sales-order fulfillment requires a narrative.");
+  const [salesOrder] = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.id, input.salesOrderRecordId), eq(erpOperationalRecords.ventureId, input.ventureId))).limit(1);
+  if (!salesOrder || salesOrder.domain !== "sales" || salesOrder.recordType !== "sales_order") throw new Error("Approved sales order not found in the active venture.");
+  if (!['approved', 'posted'].includes(salesOrder.status)) throw new Error("Sales orders must be approved or posted before fulfillment.");
+  const item = await requireMaster(db, input.ventureId, input.itemMasterId);
+  if (item.domain !== "item") throw new Error("Sales-order fulfillment requires an item master record.");
+  const orderMovements = await db.select().from(erpInventoryMovements).where(and(eq(erpInventoryMovements.ventureId, input.ventureId), eq(erpInventoryMovements.operationalRecordId, salesOrder.id), eq(erpInventoryMovements.itemMasterId, input.itemMasterId)));
+  const reservedForOrder = orderMovements.reduce((total, movement) => total + (movement.movementType === "reserve" ? Number(movement.quantity) : movement.movementType === "release" ? -Number(movement.quantity) : 0), 0);
+  if (reservedForOrder < quantity) throw new Error("Sales-order fulfillment cannot exceed the order-linked reserved inventory.");
+  const remainingReserved = Math.round((reservedForOrder - quantity) * 1000) / 1000;
+  if (input.finalFulfillment && remainingReserved > 0) throw new Error("Final fulfillment requires consuming all remaining order-linked reservations.");
+  const outcome = await db.transaction(async tx => {
+    const [balance] = await tx.select().from(erpInventoryBalances).where(and(eq(erpInventoryBalances.ventureId, input.ventureId), eq(erpInventoryBalances.itemMasterId, input.itemMasterId))).limit(1);
+    const onHand = Number(balance?.onHandQuantity ?? 0); const reserved = Number(balance?.reservedQuantity ?? 0);
+    if (!balance || onHand < quantity || reserved < quantity) throw new Error("Insufficient reserved inventory for sales-order fulfillment.");
+    const nextOnHand = Math.round((onHand - quantity) * 1000) / 1000; const nextReserved = Math.round((reserved - quantity) * 1000) / 1000;
+    if (nextOnHand < 0 || nextReserved < 0 || nextReserved > nextOnHand) throw new Error("Inventory balance invariant failed.");
+    await tx.update(erpInventoryBalances).set({ onHandQuantity: String(nextOnHand), reservedQuantity: String(nextReserved) }).where(eq(erpInventoryBalances.id, balance.id));
+    const release = await tx.insert(erpInventoryMovements).values({ ventureId: input.ventureId, itemMasterId: input.itemMasterId, operationalRecordId: salesOrder.id, movementType: "release", quantity: String(quantity), onHandAfter: String(onHand), reservedAfter: String(nextReserved), narrative: `Release for fulfillment: ${input.narrative}`, createdByUserId: input.actorUserId });
+    const issue = await tx.insert(erpInventoryMovements).values({ ventureId: input.ventureId, itemMasterId: input.itemMasterId, operationalRecordId: salesOrder.id, movementType: "issue", quantity: String(quantity), onHandAfter: String(nextOnHand), reservedAfter: String(nextReserved), narrative: input.narrative, createdByUserId: input.actorUserId });
+    return { releaseMovementId: Number(release[0].insertId), issueMovementId: Number(issue[0].insertId), onHandQuantity: nextOnHand, reservedQuantity: nextReserved, availableQuantity: Math.round((nextOnHand - nextReserved) * 1000) / 1000 };
+  });
+  const status = input.finalFulfillment ? "fulfilled" : salesOrder.status;
+  if (input.finalFulfillment) await db.update(erpOperationalRecords).set({ status, updatedAt: new Date() }).where(eq(erpOperationalRecords.id, salesOrder.id));
+  await createAuditEvent({ ventureId: input.ventureId, domain: "sales", operationalRecordId: salesOrder.id, eventType: "sales_order.inventory_fulfilled", actorUserId: input.actorUserId, payload: { itemMasterId: input.itemMasterId, quantity, releaseMovementId: outcome.releaseMovementId, issueMovementId: outcome.issueMovementId, finalFulfillment: Boolean(input.finalFulfillment), resultingStatus: status, noExternalShipmentOrBilling: true } });
+  return { salesOrderRecordId: salesOrder.id, quantity, status, finalFulfillment: Boolean(input.finalFulfillment), ...outcome };
+}
+
 export async function createWorkflowDefinition(input: { ventureId: number; key: string; name: string; domain: string; definition: { nodes: Array<{ id: string; type: "start" | "task" | "approval" | "gateway" | "end"; title: string }>; transitions: Array<{ from: string; to: string; condition?: string }> }; createdByUserId: number }) {
   if (!input.definition.nodes.some(node => node.type === "start") || !input.definition.nodes.some(node => node.type === "end")) throw new Error("Workflow definition must contain start and end nodes.");
   const db = await requireDb();
