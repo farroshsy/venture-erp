@@ -103,4 +103,4 @@
 - [x] Implement dedicated employee and compensation-component controls with domain-specific fields, validation, lifecycle/audit behavior, and role guards beyond generic operational records.
 - [ ] Implement specialized project/task, asset/maintenance, service-request, and CRM-opportunity workflows with explicit domain states, validation, audit evidence, and responsive UI behavior beyond shared record templates.
 - [ ] Implement dedicated project/task and asset/maintenance records with normalized tenancy, domain-specific lifecycle validation, audit events, role guards, responsive UI, and typed-route integration evidence.
-- [ ] Add real typed-route integration evidence for project, task, asset, and maintenance lifecycles with operator proposal, approver-gated activation, tenant isolation, and audit assertions.
+- [x] Add real typed-route integration evidence for project, task, asset, and maintenance lifecycles with operator proposal, approver-gated activation, tenant isolation, and audit assertions.
