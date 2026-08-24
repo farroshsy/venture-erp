@@ -118,4 +118,32 @@ describe("typed-route sales lifecycle with real authorization", () => {
     expect(audits.some(event => event.eventType === "people.employee_profile_transitioned")).toBe(true);
     expect(audits.some(event => event.eventType === "people.compensation_component_transitioned")).toBe(true);
   }, 20_000);
+
+  it("enforces dedicated project, task, asset, and maintenance transitions beyond generic work records", async () => {
+    const operator = callerFor(operatorUserId, operatorOpenId); const admin = callerFor(1, "owner");
+    const masters = await operator.master.list({ ventureId });
+    let projectMaster = masters.find(master => master.domain === "project" && master.code === "VALIDATION-E2E-PROJECT-MASTER-20260824");
+    if (!projectMaster) projectMaster = await operator.master.create({ ventureId, domain: "project", code: "VALIDATION-E2E-PROJECT-MASTER-20260824", name: "VALIDATION-ONLY project master", attributes: { validationOnly: true } });
+    let assetMaster = masters.find(master => master.domain === "asset" && master.code === "VALIDATION-E2E-ASSET-MASTER-20260824");
+    if (!assetMaster) assetMaster = await operator.master.create({ ventureId, domain: "asset", code: "VALIDATION-E2E-ASSET-MASTER-20260824", name: "VALIDATION-ONLY asset master", attributes: { validationOnly: true } });
+    let project = (await operator.deliveryAssets.projects({ ventureId })).find(row => row.projectCode === "VALIDATION-E2E-PROJECT-20260824");
+    if (!project) project = await operator.deliveryAssets.createProject({ ventureId, projectMasterId: projectMaster.id, projectCode: "VALIDATION-E2E-PROJECT-20260824", name: "VALIDATION-ONLY dedicated project", startDate: "2026-08-24", attributes: { validationOnly: true } });
+    if (project.status === "draft") await expect(operator.deliveryAssets.transitionProject({ ventureId, projectId: project.id, targetStatus: "active" })).rejects.toThrow();
+    if (project.status === "draft") await admin.deliveryAssets.transitionProject({ ventureId, projectId: project.id, targetStatus: "active" });
+    let task = (await operator.deliveryAssets.tasks({ ventureId })).find(row => row.taskCode === "VALIDATION-E2E-DEDICATED-TASK-20260824");
+    if (!task) task = await operator.deliveryAssets.createTask({ ventureId, projectId: project.id, taskCode: "VALIDATION-E2E-DEDICATED-TASK-20260824", title: "VALIDATION-ONLY dedicated task", priority: "normal", attributes: { validationOnly: true } });
+    if (task.status === "draft") await operator.deliveryAssets.transitionTask({ ventureId, projectTaskId: task.id, targetStatus: "ready" });
+    if (task.status === "draft" || task.status === "ready") await operator.deliveryAssets.transitionTask({ ventureId, projectTaskId: task.id, targetStatus: "in_progress" });
+    let asset = (await operator.deliveryAssets.assets({ ventureId })).find(row => row.assetTag === "VALIDATION-E2E-ASSET-20260824");
+    if (!asset) asset = await operator.deliveryAssets.createAsset({ ventureId, assetMasterId: assetMaster.id, assetTag: "VALIDATION-E2E-ASSET-20260824", name: "VALIDATION-ONLY dedicated asset", attributes: { validationOnly: true } });
+    if (asset.status === "draft") await admin.deliveryAssets.transitionAsset({ ventureId, assetId: asset.id, targetStatus: "in_service" });
+    let maintenance = (await operator.deliveryAssets.maintenance({ ventureId })).find(row => row.workOrderNumber === "VALIDATION-E2E-MAINT-20260824");
+    if (!maintenance) maintenance = await operator.deliveryAssets.createMaintenance({ ventureId, assetId: asset.id, workOrderNumber: "VALIDATION-E2E-MAINT-20260824", title: "VALIDATION-ONLY maintenance", maintenanceType: "inspection", attributes: { validationOnly: true } });
+    if (maintenance.status === "draft") await operator.deliveryAssets.transitionMaintenance({ ventureId, maintenanceWorkOrderId: maintenance.id, targetStatus: "scheduled" });
+    const audits = await admin.audit({ ventureId });
+    expect((await admin.deliveryAssets.projects({ ventureId })).find(row => row.id === project!.id)?.status).toBe("active");
+    expect((await admin.deliveryAssets.assets({ ventureId })).find(row => row.id === asset!.id)?.status).toBe("in_service");
+    expect(audits.some(event => event.eventType === "projects.project_transitioned")).toBe(true);
+    expect(audits.some(event => event.eventType === "assets.maintenance_transitioned")).toBe(true);
+  }, 20_000);
 });

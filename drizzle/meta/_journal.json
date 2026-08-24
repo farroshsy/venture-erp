@@ -85,6 +85,13 @@
       "when": 1787550149751,
       "tag": "0011_faithful_paper_doll",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1787550759729,
+      "tag": "0012_charming_shinobi_shaw",
+      "breakpoints": true
     }
   ]
 }
