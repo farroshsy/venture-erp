@@ -92,3 +92,4 @@
 - [x] Replace the native access-action selector with explicit action controls so grant, suspend, and revoke are keyboard- and browser-automation-reachable in lifecycle reviews.
 - [x] Add a controlled sales-order inventory reservation and fulfillment workflow that requires an approved tenant-scoped sales order, preserves inventory availability invariants, creates audit evidence, and does not execute shipping, billing, or payment.
 - [x] Add explicit, tenant-scoped operational-record event triggers to active BPMN workflow definitions so approved records can start a human-gated workflow with durable audit evidence and no external side effect.
+- [x] Add a read-only database integration test that verifies the authorized validation venture’s real sales-order reservation, internal fulfillment, event-triggered workflow instance, pending human task, audit evidence, and absence from a separate tenant boundary.
