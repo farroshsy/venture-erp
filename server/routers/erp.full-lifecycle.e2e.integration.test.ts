@@ -146,4 +146,24 @@ describe("typed-route sales lifecycle with real authorization", () => {
     expect(audits.some(event => event.eventType === "projects.project_transitioned")).toBe(true);
     expect(audits.some(event => event.eventType === "assets.maintenance_transitioned")).toBe(true);
   }, 20_000);
+
+  it("enforces dedicated service requests and CRM opportunities beyond generic work records", async () => {
+    const operator = callerFor(operatorUserId, operatorOpenId); const admin = callerFor(1, "owner");
+    const masters = await operator.master.list({ ventureId });
+    let customer = masters.find(master => master.domain === "customer" && master.code === "VALIDATION-E2E-SERVICE-CRM-CUSTOMER-20260824");
+    if (!customer) customer = await operator.master.create({ ventureId, domain: "customer", code: "VALIDATION-E2E-SERVICE-CRM-CUSTOMER-20260824", name: "VALIDATION-ONLY service and CRM customer", attributes: { validationOnly: true } });
+    let request = (await operator.serviceCrm.serviceRequests({ ventureId })).find(row => row.requestNumber === "VALIDATION-E2E-SERVICE-REQUEST-20260824");
+    if (!request) request = await operator.serviceCrm.createServiceRequest({ ventureId, requestNumber: "VALIDATION-E2E-SERVICE-REQUEST-20260824", customerMasterId: customer.id, title: "VALIDATION-ONLY service request", severity: "normal", requestedDate: "2026-08-24", attributes: { validationOnly: true, noExternalDispatch: true } });
+    if (request.status === "draft") await operator.serviceCrm.transitionServiceRequest({ ventureId, serviceRequestId: request.id, targetStatus: "submitted" });
+    if (request.status === "draft" || request.status === "submitted") await operator.serviceCrm.transitionServiceRequest({ ventureId, serviceRequestId: request.id, targetStatus: "triaged" });
+    let opportunity = (await operator.serviceCrm.opportunities({ ventureId })).find(row => row.opportunityNumber === "VALIDATION-E2E-OPPORTUNITY-DEDICATED-20260824");
+    if (!opportunity) opportunity = await operator.serviceCrm.createOpportunity({ ventureId, opportunityNumber: "VALIDATION-E2E-OPPORTUNITY-DEDICATED-20260824", customerMasterId: customer.id, name: "VALIDATION-ONLY dedicated opportunity", estimatedAmount: 100, currency: "USD", attributes: { validationOnly: true, noExternalCrmAction: true } });
+    if (opportunity.stage === "draft") await expect(operator.serviceCrm.transitionOpportunity({ ventureId, opportunityId: opportunity.id, targetStage: "qualified" })).rejects.toThrow();
+    if (opportunity.stage === "draft") await admin.serviceCrm.transitionOpportunity({ ventureId, opportunityId: opportunity.id, targetStage: "qualified" });
+    const audits = await admin.audit({ ventureId });
+    expect((await admin.serviceCrm.serviceRequests({ ventureId })).find(row => row.id === request!.id)?.status).toBe("triaged");
+    expect((await admin.serviceCrm.opportunities({ ventureId })).find(row => row.id === opportunity!.id)?.stage).toBe("qualified");
+    expect(audits.some(event => event.eventType === "service.request_transitioned")).toBe(true);
+    expect(audits.some(event => event.eventType === "crm.opportunity_transitioned")).toBe(true);
+  }, 20_000);
 });

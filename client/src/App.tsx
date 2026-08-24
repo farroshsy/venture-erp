@@ -22,6 +22,7 @@ const ProcurementControl = lazy(() => import("./pages/ProcurementControl"));
 const SalesControl = lazy(() => import("./pages/SalesControl"));
 const PeopleControl = lazy(() => import("./pages/PeopleControl"));
 const DeliveryAssetsControl = lazy(() => import("./pages/DeliveryAssetsControl"));
+const ServiceCrmControl = lazy(() => import("./pages/ServiceCrmControl"));
 const WorkControl = lazy(() => import("./pages/WorkControl"));
 const CashControl = lazy(() => import("./pages/CashControl"));
 const OperationalInsights = lazy(() => import("./pages/OperationalInsights"));
@@ -47,6 +48,7 @@ function Router() {
       <Route path={"/sales"} component={SalesControl} />
       <Route path={"/people"} component={PeopleControl} />
       <Route path={"/delivery-assets"} component={DeliveryAssetsControl} />
+      <Route path={"/service-crm"} component={ServiceCrmControl} />
       <Route path={"/work"} component={WorkControl} />
       <Route path={"/cash"} component={CashControl} />
       <Route path={"/insights"} component={OperationalInsights} />
