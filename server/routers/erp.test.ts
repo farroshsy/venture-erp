@@ -94,6 +94,13 @@ describe("operational ERP router", () => {
     expect(service.listWorkflowInstances).toHaveBeenCalledWith(21);
     expect(service.completeWorkflowTask).toHaveBeenCalledWith({ ventureId: 21, workflowTaskId: 99, outcome: "rejected", actorUserId: 7 });
   });
+  it("persists an explicit approved-sales-order event trigger through the governed workflow contract", async () => {
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "portfolio_admin", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(service.createWorkflowDefinition).mockResolvedValue({ id: 111, status: "draft" } as never);
+    await expect(caller().workflow.create({ ventureId: 21, key: "sales_order_approval_trigger", name: "Sales order approval trigger", domain: "sales", definition: { nodes: [{ id: "start", type: "start", title: "Sales order approved" }, { id: "end", type: "end", title: "Evidence complete" }], transitions: [{ from: "start", to: "end" }], trigger: { event: "operational_record.transitioned", domain: "sales", recordType: "sales_order", targetStatus: "approved" } } })).resolves.toMatchObject({ id: 111 });
+    expect(service.createWorkflowDefinition).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, createdByUserId: 7, definition: expect.objectContaining({ trigger: { event: "operational_record.transitioned", domain: "sales", recordType: "sales_order", targetStatus: "approved" } }) }));
+  });
   it("requires an operational role before creating a transaction", async () => {
     vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "viewer", status: "active", createdAt: new Date(), updatedAt: new Date() });
     vi.mocked(requireVentureRole).mockImplementation(() => { throw new Error("FORBIDDEN"); });

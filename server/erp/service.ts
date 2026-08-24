@@ -213,6 +213,13 @@ export async function transitionOperationalRecord(input: { ventureId: number; op
     await db.update(erpBudgetNodes).set({ committedAmount: String(normalizeMoney(Math.max(0, Number(node.committedAmount) - Number(record.functionalAmount)))), spentAmount: String(normalizeMoney(Number(node.spentAmount) + Number(record.functionalAmount))) }).where(eq(erpBudgetNodes.id, node.id));
   }
   await createAuditEvent({ ventureId: input.ventureId, domain: record.domain, operationalRecordId: record.id, eventType: "record.transitioned", actorUserId: input.actorUserId, payload: { from: record.status, to: input.targetStatus, note: input.note ?? null } });
+  const activeDefinitions = await db.select().from(erpWorkflowDefinitions).where(and(eq(erpWorkflowDefinitions.ventureId, input.ventureId), eq(erpWorkflowDefinitions.status, "active")));
+  for (const definition of activeDefinitions) {
+    const trigger = (definition.definition as { trigger?: WorkflowTrigger }).trigger;
+    if (!trigger || trigger.event !== "operational_record.transitioned" || trigger.targetStatus !== input.targetStatus || (trigger.domain && trigger.domain !== record.domain) || (trigger.recordType && trigger.recordType !== record.recordType)) continue;
+    const instance = await startWorkflow({ ventureId: input.ventureId, workflowDefinitionId: definition.id, operationalRecordId: record.id, assigneeUserId: input.actorUserId, context: { trigger: trigger.event, recordDomain: record.domain, recordType: record.recordType, targetStatus: input.targetStatus, noExternalEffect: true }, startedByUserId: input.actorUserId });
+    await createAuditEvent({ ventureId: input.ventureId, domain: "workflow", operationalRecordId: record.id, eventType: "workflow.event_triggered", actorUserId: input.actorUserId, payload: { workflowDefinitionId: definition.id, workflowInstanceId: instance.id, trigger, noExternalEffect: true } });
+  }
   return { id: record.id, from: record.status, to: input.targetStatus };
 }
 
@@ -269,6 +276,7 @@ export async function postJournal(input: { ventureId: number; journalId: number;
 }
 
 export type InventoryMovementType = "receipt" | "issue" | "adjust_in" | "adjust_out" | "reserve" | "release";
+export type WorkflowTrigger = { event: "operational_record.transitioned"; domain?: OperationalDomain; recordType?: string; targetStatus: OperationalStatus };
 
 export async function listInventoryBalances(ventureId: number) {
   const db = await requireDb();
@@ -376,7 +384,7 @@ export async function fulfillSalesOrderInventory(input: { ventureId: number; sal
   return { salesOrderRecordId: salesOrder.id, quantity, status, finalFulfillment: Boolean(input.finalFulfillment), ...outcome };
 }
 
-export async function createWorkflowDefinition(input: { ventureId: number; key: string; name: string; domain: string; definition: { nodes: Array<{ id: string; type: "start" | "task" | "approval" | "gateway" | "end"; title: string }>; transitions: Array<{ from: string; to: string; condition?: string }> }; createdByUserId: number }) {
+export async function createWorkflowDefinition(input: { ventureId: number; key: string; name: string; domain: string; definition: { nodes: Array<{ id: string; type: "start" | "task" | "approval" | "gateway" | "end"; title: string }>; transitions: Array<{ from: string; to: string; condition?: string }>; trigger?: WorkflowTrigger }; createdByUserId: number }) {
   if (!input.definition.nodes.some(node => node.type === "start") || !input.definition.nodes.some(node => node.type === "end")) throw new Error("Workflow definition must contain start and end nodes.");
   const db = await requireDb();
   const result = await db.insert(erpWorkflowDefinitions).values({ ...input, version: 1, status: "draft" });
