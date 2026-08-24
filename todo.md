@@ -39,8 +39,8 @@
 - [x] Document the platform upgrade rationale, repository-evolution plan, operational costs, migration path, rollback posture, and multi-year roadmap.
 - [x] Validate the enterprise dashboards, assistant, RBAC UI, tenant security, and responsive behavior; resolve issues found.
 - [x] Implement distinct revoke and suspend effects for scoped assignments, add focused proof, and re-run RBAC validation.
-- [ ] Add grant, suspend, and revoke request controls plus portfolio, venture, and module scope selection to the access-administration UI; visually validate the complete access-change lifecycle.
-- [ ] Create a clearly labeled validation venture and use it only to verify authorized grant, suspend, and revoke access workflows without fabricating broader operational records.
+- [x] Add grant, suspend, and revoke request controls plus portfolio, venture, and module scope selection to the access-administration UI; visually validate the complete access-change lifecycle.
+- [x] Create a clearly labeled validation venture and use it only to verify authorized grant, suspend, and revoke access workflows without fabricating broader operational records.
 - [x] Assess the referenced competitor and classify its capabilities into immediately buildable ERP workflows, integration-dependent features, and regulated or jurisdiction-specific controls.
 - [x] Define an operational ERP coverage matrix across general ledger, tax configuration, budgets, sales, procurement, inventory, people, payroll, projects, assets, service, CRM, analytics, supply chain, manufacturing, integrations, and IoT-adjacent telemetry.
 - [x] Implement a shared ERP operational core with venture-scoped master data, accounting periods, configurable tax policies, budget envelopes, audit events, approval policies, and BPMN-style workflow definitions.
@@ -85,3 +85,8 @@
 - [x] Add Automation Workbench views for live workflow instances and pending tasks with assignee and status evidence.
 - [x] Add in-workbench approve, reject, and complete actions that use the tenant-scoped task contract and surface resulting status and audit evidence without external side effects.
 - [x] Add focused rejection-path proof showing exception evidence is visible and auditable in the Automation Workbench.
+- [x] Perform a browser-driven Access Administration lifecycle: create a scoped grant request, verify pending review, apply it, confirm assignment state, then repeat visible suspend and revoke outcomes.
+- [x] Create a separate access-only validation venture, or revise the isolation requirement with the user, before claiming access-lifecycle validation is isolated from broader operational fixtures.
+- [x] Allow an authenticated accessible venture to be selected by an optional query parameter so isolated tenant workflows can be opened and reviewed reproducibly without weakening membership checks.
+- [x] Preselect the sole eligible venture member in access-change forms while preserving explicit selection when multiple members are available.
+- [x] Replace the native access-action selector with explicit action controls so grant, suspend, and revoke are keyboard- and browser-automation-reachable in lifecycle reviews.

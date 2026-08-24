@@ -32,6 +32,12 @@ export function VentureProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (ventures.length === 0) return;
+    const requestedId = Number(new URLSearchParams(window.location.search).get("venture"));
+    if (Number.isInteger(requestedId) && ventures.some(venture => venture.id === requestedId)) {
+      if (activeVentureId !== requestedId) setActiveVentureIdState(requestedId);
+      window.localStorage.setItem("venture-erp.active-venture", String(requestedId));
+      return;
+    }
     if (!activeVentureId || !ventures.some(venture => venture.id === activeVentureId)) {
       setActiveVentureIdState(ventures[0].id);
     }

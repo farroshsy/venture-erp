@@ -123,3 +123,31 @@ The real workflow service path was exercised in the authorized validation ventur
 The lazy-loaded Automation Workbench route resolved successfully in the authenticated validation venture and listed the three persisted validation definitions. Its initial canvas state correctly required selecting a saved definition before rendering a process diagram or live task evidence.
 
 The completed Workbench now selects the newest saved definition after load and rendered the isolated rejection-path definition `validation_visual_automation_rejection_20260824`. The page showed its three-node directed process, active status, instance `60001` with status `rejected`, task `60001` assigned to user `1` with status `rejected`, and the related workflow audit sequence: `workflow.created`, `workflow.activated`, `workflow.started`, and `workflow.task_completed`. Focused router coverage also proved tenant-scoped instance listing and forwarding of a rejected task outcome with the authenticated actor identity. This proof is internal, validation-only, and produced no external side effect.
+
+### Scoped access lifecycle
+
+The authenticated Access Administration workspace rendered the active validation venture, the scoped member/role/action/scope/module controls, and the access-review queue. A validation-only module-scoped `module_operator` assignment for the existing validation-venture administrator was requested and applied as a grant, then requested and applied as a suspension, and finally requested and applied as a revoke. The persisted review queue visibly retained three applied records named `VALIDATION-ACCESS-LIFECYCLE-20260824:grant`, `:suspend`, and `:revoke`, all scoped to the `finance` module. The final matching scoped-assignment count was `0`; venture membership itself was not changed, and no unrelated operational data, external integration, payment, filing, or user account was created.
+
+To isolate the remaining browser-driven proof, `ACCESS ONLY VALIDATION VENTURE — 2026-08-24` was created through the in-app tenant-boundary control with its owner membership only. The authenticated Access Administration route resolved this venture through a membership-validated `venture=30001` selection and displayed an empty access directory and review queue before lifecycle requests were created.
+
+The isolated route then loaded the active scope, its sole owner membership, the policy role catalog, the scoped access-change controls, and the empty request/assignment panels in the browser. No operational records or integration configuration were created in this venture.
+
+The browser then submitted the isolated venture-scope grant request with rationale `VALIDATION-UI-GRANT: grant a reviewable architecture reviewer role only within this isolated venture.` Read-only database verification confirmed request `30001` persisted as `pending` for `architecture_reviewer` before any apply action was attempted.
+
+After reload, the browser rendered the same request as `PENDING` in the isolated venture review queue and exposed its distinct `Apply reviewed grant` control. The assignment register still showed no scoped assignment at that pending stage, preserving the separate request-and-review lifecycle.
+
+The browser then applied that reviewed grant. The queue rendered `APPLIED`, and the isolated tenant access directory rendered the resulting `Architecture reviewer` venture-scoped assignment with status `ACTIVE` for the validation-venture owner.
+
+The access form was refined with explicit Grant, Suspend, and Revoke action controls so each lifecycle intent is directly reachable without relying on native selector behavior. The form continued to display the isolated tenant’s sole owner, the `Architecture reviewer` role, the venture scope, and the active assignment before the suspension path was requested.
+
+The browser then created a separate `VALIDATION-UI-SUSPEND` request for that same isolated venture-scoped reviewer assignment. The review queue rendered it as `PENDING` beside the already applied grant, while the access directory correctly remained `ACTIVE` until the pending suspension received its own explicit apply action.
+
+The browser subsequently applied the isolated suspension. Both the grant and suspension requests rendered `APPLIED`, and the access directory retained the reviewer assignment with status `SUSPENDED`, proving that suspension preserves its audit record while disabling the scoped assignment.
+
+With the reviewer assignment visibly `SUSPENDED`, the browser returned to the isolated form where the explicit Revoke action remained available against the same role and venture scope. This final request is intended to remove only the validation assignment while retaining the lifecycle review record.
+
+The browser submitted `VALIDATION-UI-REVOKE` as a distinct `PENDING` request. At this point the directory correctly still showed the reviewer assignment as `SUSPENDED`; the separate visible `Apply reviewed revoke` control enforced the final review boundary before deletion.
+
+The browser applied the final revoke. The isolated access directory returned to its empty scoped-assignment state, while the review queue retained three independently `APPLIED` records for `VALIDATION-UI-GRANT`, `VALIDATION-UI-SUSPEND`, and `VALIDATION-UI-REVOKE`. This completes the UI-driven grant → pending review → apply → active assignment → suspension → revoke lifecycle in a separate access-only validation tenant. The owner’s venture membership remained active throughout; no external integration, payment, filing, payroll, or operational transaction was created.
+
+Desktop and mobile captures confirmed that the explicit action controls, form fields, assignment register, and review cards remain visible in the responsive layout. The final quality gate passed: 18 unit test files / 53 tests, 4 integration test files / 8 tests, contract validation, foundation verification, and the production build. The production build retained lazy route splitting; the Access Administration route chunk measured approximately 30.7 kB before compression, and the largest shared vendor chunk remained approximately 401.0 kB without a bundle advisory.
