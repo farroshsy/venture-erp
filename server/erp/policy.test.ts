@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { availableBudget, calculatePayrollProposal, calculateTax, canTransition, convertCurrency } from "./policy";
+import { availableBudget, calculatePayrollProposal, calculateTax, canTransition, convertCurrency, validateBalancedJournal } from "./policy";
 
 describe("operational ERP policies", () => {
   it("calculates exclusive and inclusive tax from configured policy inputs", () => {
@@ -19,5 +19,9 @@ describe("operational ERP policies", () => {
   });
   it("calculates public-budget availability after commitments and spend", () => {
     expect(availableBudget(1000, 250, 300)).toBe(450);
+  });
+  it("requires positive, narrated, balanced debit and credit journal lines", () => {
+    expect(validateBalancedJournal([{ accountMasterId: 1, entrySide: "debit", amount: 100, narrative: "Cash receipt" }, { accountMasterId: 2, entrySide: "credit", amount: 100, narrative: "Revenue recognition" }])).toEqual({ debit: 100, credit: 100, lineCount: 2 });
+    expect(() => validateBalancedJournal([{ accountMasterId: 1, entrySide: "debit", amount: 100, narrative: "Cash receipt" }, { accountMasterId: 2, entrySide: "credit", amount: 90, narrative: "Revenue recognition" }])).toThrow("Journal debits and credits must balance.");
   });
 });

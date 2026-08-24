@@ -75,3 +75,27 @@ The linked approval branch was also exercised in the same validation venture. Th
 The final quality gate passed after all schema, service, router, UI, and documentation changes: TypeScript check, 46-unit-test suite, eight integration tests, contract validation, foundation verification, and production build. The responsive 375px captures rendered both Asia Operations and Cross-Border Finance without clipped controls or horizontal overflow. The production build emitted a chunk-size advisory for the main client bundle; this is a performance follow-up, not a build failure.
 
 No end-to-end statutory payroll calculation was created because the validation venture has no reviewed and actively selected payroll jurisdiction pack. That is an intentional production prerequisite, not a missing bypass: a qualified local reviewer must supply an effective-dated, source-linked pack before the platform may rehearse a pack-dependent payroll run.
+
+### Balanced journal workflow
+
+The real journal service path was exercised in the authorized validation venture with an explicitly labelled open validation period and two validation-only chart-of-accounts masters. Journal `VALIDATION-JRN-20260824` persisted two narrated IDR lines—one debit and one credit—of `100.00` each and reached `posted` after the service revalidated balance and the open-period guard. This was an internal accounting-control proof only: no bank payment, external ledger transmission, filing, or statutory posting was performed.
+
+The new finance-lead period-close action was separately exercised against an explicitly labelled empty validation period. `VALIDATION-CLOSE-2026-09` reached `closed` through the real service path and emitted its audit event. The close path rejects an already closed period and blocks a period that retains draft journals; no pre-existing or business accounting window was modified.
+
+### Inventory movement and reservation controls
+
+The real inventory service path was exercised in the authorized validation venture with one explicitly labelled item. A receipt of `10.000`, reservation of `3.000`, and issue of `4.000` produced an on-hand balance of `6.000`, reserved balance of `3.000`, and available balance of `3.000`. Each immutable movement recorded its own post-operation quantities and audit evidence. The validation did not connect a WMS, barcode/RFID device, supplier, carrier, or external warehouse.
+
+### Approved purchase-order receiving
+
+The procurement-to-inventory receipt path was exercised with a clearly labelled validation-only purchase order. `VALIDATION-PO-20260824` progressed from draft through approval, then its final receipt created linked inventory movement `30001` for `2.000` units and set the purchase-order status to `fulfilled`. The resulting validation item balance became `8.000` on hand and `3.000` reserved. No supplier payment, e-invoice, customs filing, supplier-portal interaction, or external inventory system was contacted.
+
+The authenticated Inventory Control route rendered the persisted validation item, its on-hand/reserved/available values, and each receipt, reservation, and issue movement. The Procurement Control route rendered the receipt form and an empty eligible queue after the validation order became fulfilled, which is the intended control behavior: fulfilled orders cannot be received again.
+
+### Work-control lifecycle
+
+The domain-specific Work Control workspace was exercised through the real project-task lifecycle using clearly labelled record `VALIDATION-PROJECT-TASK-20260824`. The tenant-scoped record progressed through pending approval, approved, posted, fulfilled, and closed states and retained its audit trail. This validation did not create payroll, employee, customer, asset, or service fixtures, and did not involve an external work-management system.
+
+### Transaction-specific increment quality gate
+
+The journal, period-close, inventory, purchase-order receipt, and work-control increment passed TypeScript checking, the 51-test suite, eight integration tests, contract validation, foundation verification, and a production build. The production build continues to emit a client bundle-size advisory; route-level code splitting remains recorded as a performance follow-up before broad rollout.

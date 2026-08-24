@@ -8,6 +8,7 @@ vi.mock("../erp/service", () => ({
   createMasterRecord: vi.fn(),
   listAccountingPeriods: vi.fn(),
   createAccountingPeriod: vi.fn(),
+  closeAccountingPeriod: vi.fn(),
   listTaxPolicies: vi.fn(),
   createTaxPolicy: vi.fn(),
   activateTaxPolicy: vi.fn(),
@@ -16,6 +17,13 @@ vi.mock("../erp/service", () => ({
   activateBudgetEnvelope: vi.fn(),
   transitionOperationalRecord: vi.fn(),
   createLedgerEntry: vi.fn(),
+  listJournals: vi.fn(),
+  createJournal: vi.fn(),
+  postJournal: vi.fn(),
+  listInventoryBalances: vi.fn(),
+  listInventoryMovements: vi.fn(),
+  recordInventoryMovement: vi.fn(),
+  receivePurchaseOrder: vi.fn(),
   listWorkflowDefinitions: vi.fn(),
   createWorkflowDefinition: vi.fn(),
   activateWorkflowDefinition: vi.fn(),
@@ -83,6 +91,34 @@ describe("operational ERP router", () => {
     vi.mocked(service.createOperationalRecord).mockResolvedValue({ id: 33, functionalAmount: 150, status: "draft" } as never);
     await expect(caller().records.create({ ventureId: 21, domain: "finance", recordType: "cross_border_invoice", recordNumber: "CB-1", title: "Cross-border proof", amount: 100, transactionCurrency: "IDR", functionalCurrency: "SGD", exchangeRateId: 44, publicBudgetNodeId: 8, effectiveDate: "2026-08-24", data: { crossBorder: true } })).resolves.toMatchObject({ id: 33, functionalAmount: 150 });
     expect(service.createOperationalRecord).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, transactionCurrency: "IDR", functionalCurrency: "SGD", exchangeRateId: 44, publicBudgetNodeId: 8, createdByUserId: 7 }));
+  });
+  it("forwards a balanced journal draft only through a finance-authorized tenant route", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.createJournal).mockResolvedValue({ id: 71, status: "draft", debit: 100, credit: 100, lineCount: 2 } as never);
+    await expect(caller().journal.create({ ventureId: 21, journalNumber: "JRN-001", accountingPeriodId: 4, currency: "IDR", narrative: "Opening entry", lines: [{ accountMasterId: 10, entrySide: "debit", amount: 100, narrative: "Cash" }, { accountMasterId: 11, entrySide: "credit", amount: 100, narrative: "Capital" }] })).resolves.toMatchObject({ id: 71, status: "draft" });
+    expect(service.createJournal).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, accountingPeriodId: 4, currency: "IDR", createdByUserId: 7, lines: expect.arrayContaining([expect.objectContaining({ entrySide: "debit" }), expect.objectContaining({ entrySide: "credit" })]) }));
+  });
+  it("allows a finance-authorized actor to request an auditable accounting-period close", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.closeAccountingPeriod).mockResolvedValue({ id: 4, status: "closed" } as never);
+    await expect(caller().period.close({ ventureId: 21, accountingPeriodId: 4 })).resolves.toMatchObject({ status: "closed" });
+    expect(service.closeAccountingPeriod).toHaveBeenCalledWith({ ventureId: 21, accountingPeriodId: 4, actorUserId: 7 });
+  });
+  it("forwards an inventory reservation only through the active tenant operational route", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "operator", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.recordInventoryMovement).mockResolvedValue({ id: 44, movementType: "reserve", availableQuantity: 5 } as never);
+    await expect(caller().inventory.recordMovement({ ventureId: 21, itemMasterId: 13, movementType: "reserve", quantity: 2, narrative: "Reserve stock for approved order" })).resolves.toMatchObject({ id: 44, availableQuantity: 5 });
+    expect(service.recordInventoryMovement).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, itemMasterId: 13, movementType: "reserve", quantity: 2, createdByUserId: 7 }));
+  });
+  it("forwards a final approved purchase-order receipt through the tenant operational route", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "operator", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.receivePurchaseOrder).mockResolvedValue({ purchaseOrderRecordId: 17, inventoryMovementId: 45, status: "fulfilled", finalReceipt: true } as never);
+    await expect(caller().inventory.receivePurchaseOrder({ ventureId: 21, purchaseOrderRecordId: 17, itemMasterId: 13, quantity: 2, narrative: "Final receipt", finalReceipt: true })).resolves.toMatchObject({ status: "fulfilled", finalReceipt: true });
+    expect(service.receivePurchaseOrder).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, purchaseOrderRecordId: 17, itemMasterId: 13, actorUserId: 7, finalReceipt: true }));
   });
   it("forwards a selected public-budget jurisdiction pack only through a finance-authorized venture route", async () => {
     vi.mocked(requireVentureRole).mockReset();

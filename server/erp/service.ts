@@ -5,6 +5,10 @@ import {
   erpBudgetEnvelopes,
   erpBudgetNodes,
   erpExchangeRates,
+  erpInventoryBalances,
+  erpInventoryMovements,
+  erpJournalLines,
+  erpJournals,
   erpLedgerEntries,
   erpMasterRecords,
   erpOperationalRecords,
@@ -15,7 +19,7 @@ import {
   ventures,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
-import { availableBudget, calculateTax, canTransition, convertCurrency, normalizeMoney, type OperationalStatus } from "./policy";
+import { availableBudget, calculateTax, canTransition, convertCurrency, normalizeMoney, validateBalancedJournal, type OperationalStatus } from "./policy";
 
 export type MasterDomain = "customer" | "supplier" | "item" | "employee" | "account" | "project" | "asset" | "location" | "compensation_component" | "tax_category";
 export type OperationalDomain = "finance" | "sales" | "procurement" | "inventory" | "people" | "payroll" | "projects" | "assets" | "service" | "crm";
@@ -51,6 +55,19 @@ export async function createAccountingPeriod(input: { ventureId: number; code: s
 export async function listAccountingPeriods(ventureId: number) {
   const db = await requireDb();
   return db.select().from(erpAccountingPeriods).where(eq(erpAccountingPeriods.ventureId, ventureId)).orderBy(desc(erpAccountingPeriods.startDate));
+}
+
+export async function closeAccountingPeriod(input: { ventureId: number; accountingPeriodId: number; actorUserId: number }) {
+  const db = await requireDb();
+  const rows = await db.select().from(erpAccountingPeriods).where(and(eq(erpAccountingPeriods.id, input.accountingPeriodId), eq(erpAccountingPeriods.ventureId, input.ventureId))).limit(1);
+  const period = rows[0];
+  if (!period) throw new Error("Accounting period not found in the active venture.");
+  if (period.status === "closed") throw new Error("Accounting period is already closed.");
+  const drafts = await db.select().from(erpJournals).where(and(eq(erpJournals.ventureId, input.ventureId), eq(erpJournals.accountingPeriodId, period.id), eq(erpJournals.status, "draft"))).limit(1);
+  if (drafts[0]) throw new Error("Post or void all draft journals before closing the accounting period.");
+  await db.update(erpAccountingPeriods).set({ status: "closed" }).where(eq(erpAccountingPeriods.id, period.id));
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: "period.closed", actorUserId: input.actorUserId, payload: { accountingPeriodId: period.id, code: period.code } });
+  return { id: period.id, status: "closed" as const };
 }
 
 export async function createTaxPolicy(input: { ventureId: number; code: string; name: string; category: "transaction" | "payroll"; rateBasisPoints: number; calculationMethod: "exclusive" | "inclusive" | "flat_amount"; effectiveFrom: string; effectiveTo?: string; configuration: Record<string, unknown>; createdByUserId: number }) {
@@ -172,6 +189,111 @@ export async function createLedgerEntry(input: { ventureId: number; operationalR
   const id = Number(result[0].insertId);
   await createAuditEvent({ ventureId: input.ventureId, domain: "finance", operationalRecordId: input.operationalRecordId, eventType: "ledger_entry.created", actorUserId: input.actorUserId, payload: { id, accountMasterId: input.accountMasterId, entrySide: input.entrySide, amount: normalizeMoney(input.amount) } });
   return { id, ...input, amount: normalizeMoney(input.amount) };
+}
+
+export async function createJournal(input: { ventureId: number; journalNumber: string; accountingPeriodId: number; sourceOperationalRecordId?: number; currency: string; narrative: string; lines: Array<{ accountMasterId: number; entrySide: "debit" | "credit"; amount: number; narrative: string }>; createdByUserId: number }) {
+  const db = await requireDb();
+  const totals = validateBalancedJournal(input.lines);
+  await requirePeriod(db, input.ventureId, input.accountingPeriodId);
+  if (input.sourceOperationalRecordId) {
+    const records = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.id, input.sourceOperationalRecordId), eq(erpOperationalRecords.ventureId, input.ventureId))).limit(1);
+    if (!records[0]) throw new Error("Journal source record does not belong to the active venture.");
+  }
+  for (const line of input.lines) {
+    const account = await requireMaster(db, input.ventureId, line.accountMasterId);
+    if (account.domain !== "account") throw new Error("Journal lines require chart-of-accounts masters.");
+  }
+  const result = await db.insert(erpJournals).values({ ventureId: input.ventureId, journalNumber: input.journalNumber, accountingPeriodId: input.accountingPeriodId, sourceOperationalRecordId: input.sourceOperationalRecordId, currency: input.currency, narrative: input.narrative, status: "draft", createdByUserId: input.createdByUserId });
+  const id = Number(result[0].insertId);
+  await db.insert(erpJournalLines).values(input.lines.map(line => ({ ventureId: input.ventureId, journalId: id, accountMasterId: line.accountMasterId, entrySide: line.entrySide, amount: String(normalizeMoney(line.amount)), narrative: line.narrative })));
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: "journal.created", actorUserId: input.createdByUserId, payload: { journalId: id, journalNumber: input.journalNumber, ...totals } });
+  return { id, ...input, status: "draft" as const, ...totals };
+}
+
+export async function listJournals(ventureId: number) {
+  const db = await requireDb();
+  const journals = await db.select().from(erpJournals).where(eq(erpJournals.ventureId, ventureId)).orderBy(desc(erpJournals.updatedAt));
+  const lines = await db.select().from(erpJournalLines).where(eq(erpJournalLines.ventureId, ventureId)).orderBy(desc(erpJournalLines.id));
+  return journals.map(journal => ({ ...journal, lines: lines.filter(line => line.journalId === journal.id) }));
+}
+
+export async function postJournal(input: { ventureId: number; journalId: number; actorUserId: number }) {
+  const db = await requireDb();
+  const rows = await db.select().from(erpJournals).where(and(eq(erpJournals.id, input.journalId), eq(erpJournals.ventureId, input.ventureId))).limit(1);
+  const journal = rows[0];
+  if (!journal) throw new Error("Journal not found in the active venture.");
+  if (journal.status !== "draft") throw new Error("Only draft journals may be posted.");
+  await requirePeriod(db, input.ventureId, journal.accountingPeriodId);
+  const lines = await db.select().from(erpJournalLines).where(and(eq(erpJournalLines.journalId, journal.id), eq(erpJournalLines.ventureId, input.ventureId)));
+  validateBalancedJournal(lines.map(line => ({ accountMasterId: line.accountMasterId, entrySide: line.entrySide, amount: Number(line.amount), narrative: line.narrative })));
+  await db.update(erpJournals).set({ status: "posted", postedByUserId: input.actorUserId, postedAt: new Date() }).where(eq(erpJournals.id, journal.id));
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: "journal.posted", actorUserId: input.actorUserId, payload: { journalId: journal.id, journalNumber: journal.journalNumber } });
+  return { id: journal.id, status: "posted" as const };
+}
+
+export type InventoryMovementType = "receipt" | "issue" | "adjust_in" | "adjust_out" | "reserve" | "release";
+
+export async function listInventoryBalances(ventureId: number) {
+  const db = await requireDb();
+  const balances = await db.select().from(erpInventoryBalances).where(eq(erpInventoryBalances.ventureId, ventureId));
+  const items = await db.select().from(erpMasterRecords).where(and(eq(erpMasterRecords.ventureId, ventureId), eq(erpMasterRecords.domain, "item")));
+  return balances.map(balance => ({ ...balance, availableQuantity: Number(balance.onHandQuantity) - Number(balance.reservedQuantity), item: items.find(item => item.id === balance.itemMasterId) }));
+}
+
+export async function listInventoryMovements(ventureId: number, itemMasterId?: number) {
+  const db = await requireDb();
+  return db.select().from(erpInventoryMovements).where(itemMasterId ? and(eq(erpInventoryMovements.ventureId, ventureId), eq(erpInventoryMovements.itemMasterId, itemMasterId)) : eq(erpInventoryMovements.ventureId, ventureId)).orderBy(desc(erpInventoryMovements.createdAt));
+}
+
+export async function recordInventoryMovement(input: { ventureId: number; itemMasterId: number; operationalRecordId?: number; movementType: InventoryMovementType; quantity: number; narrative: string; createdByUserId: number }) {
+  const db = await requireDb();
+  const quantity = Math.round(input.quantity * 1000) / 1000;
+  if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Inventory quantity must be greater than zero.");
+  if (!input.narrative.trim()) throw new Error("Inventory movements require a narrative.");
+  const item = await requireMaster(db, input.ventureId, input.itemMasterId);
+  if (item.domain !== "item") throw new Error("Inventory movements require an item master record.");
+  if (input.operationalRecordId) {
+    const records = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.id, input.operationalRecordId), eq(erpOperationalRecords.ventureId, input.ventureId))).limit(1);
+    if (!records[0]) throw new Error("Inventory source record does not belong to the active venture.");
+  }
+  const outcome = await db.transaction(async tx => {
+    const rows = await tx.select().from(erpInventoryBalances).where(and(eq(erpInventoryBalances.ventureId, input.ventureId), eq(erpInventoryBalances.itemMasterId, input.itemMasterId))).limit(1);
+    const current = rows[0];
+    const onHand = Number(current?.onHandQuantity ?? 0);
+    const reserved = Number(current?.reservedQuantity ?? 0);
+    const available = onHand - reserved;
+    let nextOnHand = onHand;
+    let nextReserved = reserved;
+    if (["receipt", "adjust_in"].includes(input.movementType)) nextOnHand += quantity;
+    if (["issue", "adjust_out"].includes(input.movementType)) { if (available < quantity) throw new Error("Insufficient available inventory for this issue."); nextOnHand -= quantity; }
+    if (input.movementType === "reserve") { if (available < quantity) throw new Error("Insufficient available inventory for this reservation."); nextReserved += quantity; }
+    if (input.movementType === "release") { if (reserved < quantity) throw new Error("Cannot release more inventory than is reserved."); nextReserved -= quantity; }
+    nextOnHand = Math.round(nextOnHand * 1000) / 1000;
+    nextReserved = Math.round(nextReserved * 1000) / 1000;
+    if (nextOnHand < 0 || nextReserved < 0 || nextReserved > nextOnHand) throw new Error("Inventory balance invariant failed.");
+    if (current) await tx.update(erpInventoryBalances).set({ onHandQuantity: String(nextOnHand), reservedQuantity: String(nextReserved) }).where(eq(erpInventoryBalances.id, current.id));
+    else await tx.insert(erpInventoryBalances).values({ ventureId: input.ventureId, itemMasterId: input.itemMasterId, onHandQuantity: String(nextOnHand), reservedQuantity: String(nextReserved) });
+    const result = await tx.insert(erpInventoryMovements).values({ ventureId: input.ventureId, itemMasterId: input.itemMasterId, operationalRecordId: input.operationalRecordId, movementType: input.movementType, quantity: String(quantity), onHandAfter: String(nextOnHand), reservedAfter: String(nextReserved), narrative: input.narrative, createdByUserId: input.createdByUserId });
+    return { id: Number(result[0].insertId), onHandQuantity: nextOnHand, reservedQuantity: nextReserved, availableQuantity: Math.round((nextOnHand - nextReserved) * 1000) / 1000 };
+  });
+  await createAuditEvent({ ventureId: input.ventureId, domain: "inventory", eventType: "inventory.movement_recorded", actorUserId: input.createdByUserId, payload: { movementId: outcome.id, itemMasterId: input.itemMasterId, movementType: input.movementType, quantity, onHandAfter: outcome.onHandQuantity, reservedAfter: outcome.reservedQuantity } });
+  return { ...input, quantity, ...outcome };
+}
+
+export async function receivePurchaseOrder(input: { ventureId: number; purchaseOrderRecordId: number; itemMasterId: number; quantity: number; narrative: string; finalReceipt?: boolean; actorUserId: number }) {
+  const db = await requireDb();
+  const rows = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.id, input.purchaseOrderRecordId), eq(erpOperationalRecords.ventureId, input.ventureId))).limit(1);
+  const purchaseOrder = rows[0];
+  if (!purchaseOrder || purchaseOrder.domain !== "procurement" || purchaseOrder.recordType !== "purchase_order") throw new Error("Approved purchase order not found in the active venture.");
+  if (!["approved", "posted"].includes(purchaseOrder.status)) throw new Error("Purchase orders must be approved or posted before receipt.");
+  const receipt = await recordInventoryMovement({ ventureId: input.ventureId, itemMasterId: input.itemMasterId, operationalRecordId: purchaseOrder.id, movementType: "receipt", quantity: input.quantity, narrative: input.narrative, createdByUserId: input.actorUserId });
+  let status = purchaseOrder.status;
+  if (input.finalReceipt) {
+    status = "fulfilled";
+    await db.update(erpOperationalRecords).set({ status, updatedAt: new Date() }).where(eq(erpOperationalRecords.id, purchaseOrder.id));
+  }
+  await createAuditEvent({ ventureId: input.ventureId, domain: "procurement", operationalRecordId: purchaseOrder.id, eventType: "purchase_order.received", actorUserId: input.actorUserId, payload: { itemMasterId: input.itemMasterId, quantity: receipt.quantity, inventoryMovementId: receipt.id, finalReceipt: Boolean(input.finalReceipt), resultingStatus: status } });
+  return { purchaseOrderRecordId: purchaseOrder.id, inventoryMovementId: receipt.id, quantity: receipt.quantity, status, finalReceipt: Boolean(input.finalReceipt) };
 }
 
 export async function createWorkflowDefinition(input: { ventureId: number; key: string; name: string; domain: string; definition: { nodes: Array<{ id: string; type: "start" | "task" | "approval" | "gateway" | "end"; title: string }>; transitions: Array<{ from: string; to: string; condition?: string }> }; createdByUserId: number }) {

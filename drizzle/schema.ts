@@ -277,6 +277,65 @@ export const erpLedgerEntries = mysqlTable("erp_ledger_entries", {
   index("erp_ledger_venture_record_idx").on(table.ventureId, table.operationalRecordId),
 ]);
 
+export const erpJournals = mysqlTable("erp_journals", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  journalNumber: varchar("journalNumber", { length: 64 }).notNull(),
+  accountingPeriodId: int("accountingPeriodId").notNull().references(() => erpAccountingPeriods.id),
+  sourceOperationalRecordId: int("sourceOperationalRecordId").references(() => erpOperationalRecords.id),
+  currency: varchar("currency", { length: 3 }).notNull(),
+  narrative: varchar("narrative", { length: 255 }).notNull(),
+  status: mysqlEnum("status", ["draft", "posted", "voided"]).default("draft").notNull(),
+  createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+  postedByUserId: int("postedByUserId").references(() => users.id),
+  postedAt: timestamp("postedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("erp_journal_venture_number_unique").on(table.ventureId, table.journalNumber),
+  index("erp_journal_venture_status_idx").on(table.ventureId, table.status),
+]);
+
+export const erpJournalLines = mysqlTable("erp_journal_lines", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  journalId: int("journalId").notNull().references(() => erpJournals.id),
+  accountMasterId: int("accountMasterId").notNull().references(() => erpMasterRecords.id),
+  entrySide: mysqlEnum("entrySide", ["debit", "credit"]).notNull(),
+  amount: decimal("amount", { precision: 18, scale: 2 }).notNull(),
+  narrative: varchar("narrative", { length: 255 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  index("erp_journal_line_venture_journal_idx").on(table.ventureId, table.journalId),
+]);
+
+export const erpInventoryBalances = mysqlTable("erp_inventory_balances", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  itemMasterId: int("itemMasterId").notNull().references(() => erpMasterRecords.id),
+  onHandQuantity: decimal("onHandQuantity", { precision: 18, scale: 3 }).notNull().default("0"),
+  reservedQuantity: decimal("reservedQuantity", { precision: 18, scale: 3 }).notNull().default("0"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("erp_stock_venture_item_unique").on(table.ventureId, table.itemMasterId),
+]);
+
+export const erpInventoryMovements = mysqlTable("erp_inventory_movements", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  itemMasterId: int("itemMasterId").notNull().references(() => erpMasterRecords.id),
+  operationalRecordId: int("operationalRecordId").references(() => erpOperationalRecords.id),
+  movementType: mysqlEnum("movementType", ["receipt", "issue", "adjust_in", "adjust_out", "reserve", "release"]).notNull(),
+  quantity: decimal("quantity", { precision: 18, scale: 3 }).notNull(),
+  onHandAfter: decimal("onHandAfter", { precision: 18, scale: 3 }).notNull(),
+  reservedAfter: decimal("reservedAfter", { precision: 18, scale: 3 }).notNull(),
+  narrative: varchar("narrative", { length: 255 }).notNull(),
+  createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  index("erp_stock_move_venture_item_idx").on(table.ventureId, table.itemMasterId),
+]);
+
 export const erpWorkflowDefinitions = mysqlTable("erp_workflow_definitions", {
   id: int("id").autoincrement().primaryKey(),
   ventureId: int("ventureId").notNull().references(() => ventures.id),

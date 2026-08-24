@@ -20,6 +20,24 @@ export function availableBudget(appropriatedAmount: number, committedAmount: num
   return normalizeMoney(appropriatedAmount - committedAmount - spentAmount);
 }
 
+export type JournalLineInput = { accountMasterId: number; entrySide: "debit" | "credit"; amount: number; narrative: string };
+
+export function validateBalancedJournal(lines: JournalLineInput[]) {
+  if (lines.length < 2) throw new Error("A journal requires at least two lines.");
+  const totals = lines.reduce((result, line) => {
+    const amount = normalizeMoney(line.amount);
+    if (amount <= 0) throw new Error("Journal line amounts must be greater than zero.");
+    if (!line.narrative.trim()) throw new Error("Journal lines require a narrative.");
+    if (line.entrySide === "debit") result.debit += amount;
+    else result.credit += amount;
+    return result;
+  }, { debit: 0, credit: 0 });
+  const debit = normalizeMoney(totals.debit);
+  const credit = normalizeMoney(totals.credit);
+  if (debit !== credit) throw new Error("Journal debits and credits must balance.");
+  return { debit, credit, lineCount: lines.length };
+}
+
 export function calculateTax(amount: number, rateBasisPoints: number, method: TaxMethod, configuration: unknown) {
   const base = normalizeMoney(amount);
   if (method === "flat_amount") {

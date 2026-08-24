@@ -14,6 +14,10 @@ import CrossBorderFinance from "./pages/CrossBorderFinance";
 import AccessAdministration from "./pages/AccessAdministration";
 import DecisionGovernance from "./pages/DecisionGovernance";
 import ExecutiveArchitecture from "./pages/ExecutiveArchitecture";
+import JournalControl from "./pages/JournalControl";
+import InventoryControl from "./pages/InventoryControl";
+import ProcurementControl from "./pages/ProcurementControl";
+import WorkControl from "./pages/WorkControl";
 import ModuleCatalog from "./pages/ModuleCatalog";
 import OperationsWorkspace from "./pages/OperationsWorkspace";
 import PortfolioDashboard from "./pages/PortfolioDashboard";
@@ -29,6 +33,10 @@ function Router() {
       <Route path={"/access"} component={AccessAdministration} />
       <Route path={"/modules"} component={ModuleCatalog} />
       <Route path={"/operations"} component={OperationsWorkspace} />
+      <Route path={"/journals"} component={JournalControl} />
+      <Route path={"/inventory"} component={InventoryControl} />
+      <Route path={"/procurement"} component={ProcurementControl} />
+      <Route path={"/work"} component={WorkControl} />
       <Route path={"/asia"} component={AsiaOperations} />
       <Route path={"/cross-border"} component={CrossBorderFinance} />
       <Route path={"/decisions"} component={DecisionGovernance} />

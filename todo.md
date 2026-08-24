@@ -42,7 +42,7 @@
 - [ ] Add grant, suspend, and revoke request controls plus portfolio, venture, and module scope selection to the access-administration UI; visually validate the complete access-change lifecycle.
 - [ ] Create a clearly labeled validation venture and use it only to verify authorized grant, suspend, and revoke access workflows without fabricating broader operational records.
 - [x] Assess the referenced competitor and classify its capabilities into immediately buildable ERP workflows, integration-dependent features, and regulated or jurisdiction-specific controls.
-- [ ] Define an operational ERP coverage matrix across general ledger, tax configuration, budgets, sales, procurement, inventory, people, payroll, projects, assets, service, CRM, analytics, supply chain, manufacturing, integrations, and IoT-adjacent telemetry.
+- [x] Define an operational ERP coverage matrix across general ledger, tax configuration, budgets, sales, procurement, inventory, people, payroll, projects, assets, service, CRM, analytics, supply chain, manufacturing, integrations, and IoT-adjacent telemetry.
 - [x] Implement a shared ERP operational core with venture-scoped master data, accounting periods, configurable tax policies, budget envelopes, audit events, approval policies, and BPMN-style workflow definitions.
 - [ ] Implement functional general-ledger journals, account structure, period controls, receivables, payables, and invoice-to-payment workflow records.
 - [ ] Implement functional customer, sales-order, procurement-request, purchase-order, supplier, item, inventory movement, and stock-reservation records with transaction-safe state changes.
@@ -63,8 +63,8 @@
 - [x] Implement multi-currency accounting, controlled exchange-rate conversion, public-sector budget hierarchy, payroll-run records, and country-pack applicability checks.
 - [x] Implement sandbox adapter simulations, integration health, approval controls, audit evidence, and BPMN workflow hooks for the selected operational processes.
 - [x] Research and document authoritative jurisdictional sources, supported integration prerequisites, pack ownership, legal-review gates, and country rollout sequencing.
-- [ ] Validate multi-currency, payroll, budget, sandbox integration, BPMN, tenant-isolation, and role controls; record all production prerequisites.
-- [ ] Capture the Asia-ready ERP upgrade in a reviewable checkpoint.
+- [x] Validate multi-currency, payroll, budget, sandbox integration, BPMN, tenant-isolation, and role controls; record all production prerequisites.
+- [x] Capture the Asia-ready ERP upgrade in a reviewable checkpoint.
 - [x] Add focused service and router proof that operational-record creation requires approved FX evidence, persists functional amounts, and validates public-budget-node tenancy.
 - [x] Validate a minimally scoped cross-border record against the migrated database and record transaction currency, functional currency, approved rate, functional amount, and public-budget linkage evidence.
 - [x] Enforce active venture-scoped country-pack applicability for pack-dependent payroll and public-budget workflows, rather than accepting a globally approved pack alone.
@@ -73,3 +73,9 @@
 - [x] Add explicit service proof that a jurisdiction-pack selection belonging to another venture is rejected for pack-dependent payroll and public-budget workflows.
 - [ ] Rehearse a pack-dependent payroll run only after a qualified local reviewer supplies an effective-dated, source-linked, reviewed and actively selected payroll pack for an authorized venture.
 - [ ] Reduce the main client bundle through route-level code splitting before a broad production rollout.
+- [x] Implement balanced draft/post journal batches with period-close guards, tenant-scoped accounts, and audit evidence.
+- [x] Implement balanced draft/post journal batches with period-close guards, tenant-scoped accounts, and audit evidence.
+- [x] Implement finance-lead accounting-period close controls with audit evidence and router coverage.
+- [x] Implement tenant-scoped inventory movements and stock reservations with non-negative availability guards and audit evidence.
+- [x] Implement approved purchase-order receiving that records guarded inventory receipts and advances the procurement lifecycle with audit evidence.
+- [x] Add a domain-specific work-management control workspace for people, projects, assets, service, and CRM records using the live tenant-scoped lifecycle and audit APIs.

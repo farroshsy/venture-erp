@@ -14,6 +14,7 @@ const budgetNodeLevels = ["national", "state_provincial", "municipal_local", "ag
 const payrollCadences = ["weekly", "biweekly", "semimonthly", "monthly", "ad_hoc", "off_cycle"] as const;
 const workerCategories = ["employee", "director", "contractor", "temporary", "apprentice", "expatriate", "public_servant"] as const;
 const adapterFamilies = ["banking", "attendance", "e_invoicing", "pos", "tax_filing", "statutory_reporting", "hris", "procurement"] as const;
+const inventoryMovementTypes = ["receipt", "issue", "adjust_in", "adjust_out", "reserve", "release"] as const;
 const componentSchema = z.object({ code: z.string().trim().min(1).max(96), name: z.string().trim().min(1).max(180), kind: z.enum(["earning", "deduction"]), amount: z.number().nonnegative(), taxable: z.boolean().optional() });
 
 async function requireOperationalRole(userId: number, ventureId: number) {
@@ -31,6 +32,7 @@ export const erpRouter = router({
   period: router({
     list: protectedProcedure.input(ventureInput).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return erp.listAccountingPeriods(input.ventureId); }),
     create: protectedProcedure.input(ventureInput.extend({ code: z.string().trim().min(1).max(48), name: z.string().trim().min(1).max(120), startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })).mutation(async ({ ctx, input }) => { await requireOperationalRole(ctx.user.id, input.ventureId); return erp.createAccountingPeriod({ ...input, createdByUserId: ctx.user.id }); }),
+    close: protectedProcedure.input(ventureInput.extend({ accountingPeriodId: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const membership = await requireOperationalRole(ctx.user.id, input.ventureId); requireVentureRole(membership.role, ["portfolio_admin", "venture_lead", "finance_lead"]); return erp.closeAccountingPeriod({ ...input, actorUserId: ctx.user.id }); }),
   }),
   tax: router({
     list: protectedProcedure.input(ventureInput).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return erp.listTaxPolicies(input.ventureId); }),
@@ -41,6 +43,17 @@ export const erpRouter = router({
     list: protectedProcedure.input(ventureInput).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return erp.listBudgetEnvelopes(input.ventureId); }),
     create: protectedProcedure.input(ventureInput.extend({ accountingPeriodId: z.number().int().positive().optional(), code: z.string().trim().min(1).max(64), name: z.string().trim().min(1).max(140), amount: z.number().nonnegative(), ownerUserId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => { await requireOperationalRole(ctx.user.id, input.ventureId); return erp.createBudgetEnvelope({ ...input, createdByUserId: ctx.user.id }); }),
     activate: protectedProcedure.input(ventureInput.extend({ budgetEnvelopeId: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const membership = await requireOperationalRole(ctx.user.id, input.ventureId); requireVentureRole(membership.role, ["portfolio_admin", "venture_lead", "finance_lead"]); return erp.activateBudgetEnvelope({ ...input, reviewerUserId: ctx.user.id }); }),
+  }),
+  journal: router({
+    list: protectedProcedure.input(ventureInput).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return erp.listJournals(input.ventureId); }),
+    create: protectedProcedure.input(ventureInput.extend({ journalNumber: z.string().trim().min(1).max(64), accountingPeriodId: z.number().int().positive(), sourceOperationalRecordId: z.number().int().positive().optional(), currency: z.string().trim().length(3), narrative: z.string().trim().min(1).max(255), lines: z.array(z.object({ accountMasterId: z.number().int().positive(), entrySide: z.enum(["debit", "credit"]), amount: z.number().positive(), narrative: z.string().trim().min(1).max(255) })).min(2).max(200) })).mutation(async ({ ctx, input }) => { const membership = await requireOperationalRole(ctx.user.id, input.ventureId); requireVentureRole(membership.role, ["portfolio_admin", "venture_lead", "finance_lead"]); return erp.createJournal({ ...input, createdByUserId: ctx.user.id }); }),
+    post: protectedProcedure.input(ventureInput.extend({ journalId: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const membership = await requireOperationalRole(ctx.user.id, input.ventureId); requireVentureRole(membership.role, ["portfolio_admin", "venture_lead", "finance_lead"]); return erp.postJournal({ ...input, actorUserId: ctx.user.id }); }),
+  }),
+  inventory: router({
+    balances: protectedProcedure.input(ventureInput).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return erp.listInventoryBalances(input.ventureId); }),
+    movements: protectedProcedure.input(ventureInput.extend({ itemMasterId: z.number().int().positive().optional() })).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return erp.listInventoryMovements(input.ventureId, input.itemMasterId); }),
+    recordMovement: protectedProcedure.input(ventureInput.extend({ itemMasterId: z.number().int().positive(), operationalRecordId: z.number().int().positive().optional(), movementType: z.enum(inventoryMovementTypes), quantity: z.number().positive(), narrative: z.string().trim().min(1).max(255) })).mutation(async ({ ctx, input }) => { await requireOperationalRole(ctx.user.id, input.ventureId); return erp.recordInventoryMovement({ ...input, createdByUserId: ctx.user.id }); }),
+    receivePurchaseOrder: protectedProcedure.input(ventureInput.extend({ purchaseOrderRecordId: z.number().int().positive(), itemMasterId: z.number().int().positive(), quantity: z.number().positive(), narrative: z.string().trim().min(1).max(255), finalReceipt: z.boolean().optional() })).mutation(async ({ ctx, input }) => { await requireOperationalRole(ctx.user.id, input.ventureId); return erp.receivePurchaseOrder({ ...input, actorUserId: ctx.user.id }); }),
   }),
   records: router({
     list: protectedProcedure.input(ventureInput.extend({ domain: z.enum(operationalDomains).optional() })).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return erp.listOperationalRecords(input); }),

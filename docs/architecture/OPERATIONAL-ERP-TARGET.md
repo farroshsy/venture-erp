@@ -3,6 +3,8 @@
 **Status:** Accepted implementation target  
 **Scope:** Multi-venture transactional ERP, not a static module showcase
 
+**Current capability inventory:** See [Operational Feature Coverage Matrix](./OPERATIONAL-FEATURE-COVERAGE-MATRIX.md) for the implemented, shared-core, prerequisite-bound, and roadmap classification across each ERP domain.
+
 ## Product position
 
 Venture ERP will become a **configurable operational core** rather than claim that every country-specific regulatory, banking, biometric, IoT, or government connector already exists. The product owns business records, state transitions, formula inputs, approvals, audit events, and integration contracts. It does not hardcode legal tax rates, submit statutory filings, execute bank payments, or fabricate device telemetry when no configured adapter is available.
