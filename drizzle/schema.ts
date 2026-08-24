@@ -175,6 +175,52 @@ export const erpMasterRecords = mysqlTable("erp_master_records", {
   index("erp_master_venture_domain_idx").on(table.ventureId, table.domain),
 ]);
 
+export const erpEmployeeProfiles = mysqlTable("erp_employee_profiles", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  employeeMasterId: int("employeeMasterId").notNull().references(() => erpMasterRecords.id),
+  employeeNumber: varchar("employeeNumber", { length: 96 }).notNull(),
+  department: varchar("department", { length: 120 }),
+  positionTitle: varchar("positionTitle", { length: 140 }).notNull(),
+  employmentType: mysqlEnum("employmentType", ["employee", "director", "contractor", "temporary", "apprentice", "expatriate", "public_servant"]).notNull(),
+  startDate: varchar("startDate", { length: 10 }).notNull(),
+  endDate: varchar("endDate", { length: 10 }),
+  status: mysqlEnum("status", ["draft", "active", "on_leave", "terminated"]).default("draft").notNull(),
+  calculationInputs: json("calculationInputs").notNull(),
+  createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+  activatedByUserId: int("activatedByUserId").references(() => users.id),
+  activatedAt: timestamp("activatedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("erp_employee_profile_venture_number_unique").on(table.ventureId, table.employeeNumber),
+  uniqueIndex("erp_employee_profile_venture_master_unique").on(table.ventureId, table.employeeMasterId),
+  index("erp_employee_profile_venture_status_idx").on(table.ventureId, table.status),
+]);
+
+export const erpCompensationComponents = mysqlTable("erp_compensation_components", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  code: varchar("code", { length: 96 }).notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  kind: mysqlEnum("kind", ["earning", "deduction"]).notNull(),
+  calculationMethod: mysqlEnum("calculationMethod", ["flat_amount", "percentage", "manual"]).notNull(),
+  defaultAmount: decimal("defaultAmount", { precision: 18, scale: 2 }).notNull().default("0"),
+  currency: varchar("currency", { length: 3 }).notNull(),
+  effectiveFrom: varchar("effectiveFrom", { length: 10 }).notNull(),
+  effectiveTo: varchar("effectiveTo", { length: 10 }),
+  status: mysqlEnum("status", ["draft", "active", "retired"]).default("draft").notNull(),
+  calculationInputs: json("calculationInputs").notNull(),
+  createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+  activatedByUserId: int("activatedByUserId").references(() => users.id),
+  activatedAt: timestamp("activatedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("erp_comp_component_venture_code_unique").on(table.ventureId, table.code),
+  index("erp_comp_component_venture_status_idx").on(table.ventureId, table.status),
+]);
+
 export const erpAccountingPeriods = mysqlTable("erp_accounting_periods", {
   id: int("id").autoincrement().primaryKey(),
   ventureId: int("ventureId").notNull().references(() => ventures.id),

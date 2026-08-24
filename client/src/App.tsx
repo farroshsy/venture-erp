@@ -20,6 +20,7 @@ const JournalControl = lazy(() => import("./pages/JournalControl"));
 const InventoryControl = lazy(() => import("./pages/InventoryControl"));
 const ProcurementControl = lazy(() => import("./pages/ProcurementControl"));
 const SalesControl = lazy(() => import("./pages/SalesControl"));
+const PeopleControl = lazy(() => import("./pages/PeopleControl"));
 const WorkControl = lazy(() => import("./pages/WorkControl"));
 const CashControl = lazy(() => import("./pages/CashControl"));
 const OperationalInsights = lazy(() => import("./pages/OperationalInsights"));
@@ -43,6 +44,7 @@ function Router() {
       <Route path={"/inventory"} component={InventoryControl} />
       <Route path={"/procurement"} component={ProcurementControl} />
       <Route path={"/sales"} component={SalesControl} />
+      <Route path={"/people"} component={PeopleControl} />
       <Route path={"/work"} component={WorkControl} />
       <Route path={"/cash"} component={CashControl} />
       <Route path={"/insights"} component={OperationalInsights} />

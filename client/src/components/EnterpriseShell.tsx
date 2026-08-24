@@ -3,7 +3,7 @@ import { startLogin } from "@/const";
 import { useVenture } from "@/contexts/VentureContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArrowRightLeft, Boxes, ChevronDown, GitBranch, Globe2, Grid2X2, KeyRound, Landmark, LayoutDashboard, LogOut, MessageSquareText, Network, PanelLeftClose, PanelLeftOpen, Scale, ScrollText, ShieldCheck, ShoppingCart, Workflow } from "lucide-react";
+import { ArrowRightLeft, Boxes, ChevronDown, GitBranch, Globe2, Grid2X2, KeyRound, Landmark, LayoutDashboard, LogOut, MessageSquareText, Network, PanelLeftClose, PanelLeftOpen, Scale, ScrollText, ShieldCheck, ShoppingCart, Users, Workflow } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
@@ -19,6 +19,7 @@ const navigation = [
   { path: "/inventory", label: "Inventory control", icon: Boxes },
   { path: "/procurement", label: "Procurement control", icon: Workflow },
   { path: "/sales", label: "Sales control", icon: ShoppingCart },
+  { path: "/people", label: "People control", icon: Users },
   { path: "/work", label: "Work control", icon: Workflow },
   { path: "/cash", label: "Cash control", icon: Landmark },
   { path: "/insights", label: "Operational insights", icon: LayoutDashboard },

@@ -59,4 +59,63 @@ describe("typed-route sales lifecycle with real authorization", () => {
     expect(audits.some(event => event.operationalRecordId === order!.id && event.eventType === "sales_order.inventory_fulfilled")).toBe(true);
     expect(audits.some(event => event.eventType === "workflow.task_completed")).toBe(true);
   });
+
+  it("persists explicit jurisdiction-neutral people, delivery, asset, service, and CRM work controls with approval evidence", async () => {
+    const operator = callerFor(operatorUserId, operatorOpenId);
+    const workControls = [
+      { domain: "people" as const, recordType: "employee_profile", recordNumber: "VALIDATION-E2E-EMPLOYEE-20260824", title: "VALIDATION-ONLY employee profile" },
+      { domain: "people" as const, recordType: "compensation_component", recordNumber: "VALIDATION-E2E-COMPONENT-20260824", title: "VALIDATION-ONLY compensation component" },
+      { domain: "projects" as const, recordType: "project_plan", recordNumber: "VALIDATION-E2E-PROJECT-20260824", title: "VALIDATION-ONLY project plan" },
+      { domain: "projects" as const, recordType: "task", recordNumber: "VALIDATION-E2E-TASK-20260824", title: "VALIDATION-ONLY project task" },
+      { domain: "assets" as const, recordType: "asset_register", recordNumber: "VALIDATION-E2E-ASSET-20260824", title: "VALIDATION-ONLY asset register" },
+      { domain: "assets" as const, recordType: "maintenance_work_order", recordNumber: "VALIDATION-E2E-MAINTENANCE-20260824", title: "VALIDATION-ONLY maintenance work order" },
+      { domain: "service" as const, recordType: "service_request", recordNumber: "VALIDATION-E2E-SERVICE-20260824", title: "VALIDATION-ONLY service request" },
+      { domain: "crm" as const, recordType: "opportunity", recordNumber: "VALIDATION-E2E-OPPORTUNITY-20260824", title: "VALIDATION-ONLY CRM opportunity" },
+    ];
+    let existing = await operator.records.list({ ventureId });
+    for (const control of workControls) {
+      let record = existing.find(candidate => candidate.recordNumber === control.recordNumber);
+      if (!record) {
+        record = await operator.records.create({
+          ventureId,
+          ...control,
+          amount: 100,
+          effectiveDate: "2026-08-24",
+          data: { validationOnly: true, jurisdictionNeutral: true, calculationInput: 100, noStatutoryDetermination: true, noExternalExecution: true },
+        });
+      }
+      if (record.status === "draft") await operator.records.transition({ ventureId, operationalRecordId: record.id, targetStatus: "pending_approval", note: "VALIDATION-ONLY E2E work submission" });
+      if (record.status === "draft" || record.status === "pending_approval") await operator.records.transition({ ventureId, operationalRecordId: record.id, targetStatus: "approved", note: "VALIDATION-ONLY E2E work approval" });
+    }
+    const records = await operator.records.list({ ventureId });
+    const audits = await operator.audit({ ventureId });
+    for (const control of workControls) {
+      const record = records.find(candidate => candidate.recordNumber === control.recordNumber);
+      expect(record).toMatchObject({ domain: control.domain, recordType: control.recordType, status: "approved" });
+      expect(audits.some(event => event.operationalRecordId === record?.id && event.eventType === "record.transitioned")).toBe(true);
+    }
+  }, 20_000);
+
+  it("enforces dedicated employee-profile and compensation-component approvals beyond generic work records", async () => {
+    const operator = callerFor(operatorUserId, operatorOpenId); const admin = callerFor(1, "owner");
+    const employeeCode = "VALIDATION-E2E-EMPLOYEE-MASTER-20260824";
+    const employeeNumber = "VALIDATION-E2E-EMPLOYEE-20260824";
+    const componentCode = "VALIDATION-E2E-COMPONENT-20260824";
+    const masters = await operator.master.list({ ventureId });
+    let employeeMaster = masters.find(master => master.domain === "employee" && master.code === employeeCode);
+    if (!employeeMaster) employeeMaster = await operator.master.create({ ventureId, domain: "employee", code: employeeCode, name: "VALIDATION-ONLY employee master", attributes: { validationOnly: true } });
+    let profile = (await operator.people.profiles({ ventureId })).find(candidate => candidate.employeeNumber === employeeNumber);
+    if (!profile) profile = await operator.people.createProfile({ ventureId, employeeMasterId: employeeMaster.id, employeeNumber, department: "Validation", positionTitle: "Validation operator", employmentType: "employee", startDate: "2026-08-24", calculationInputs: { internalInput: 0, jurisdictionNeutral: true, noStatutoryDetermination: true } });
+    let component = (await operator.people.components({ ventureId })).find(candidate => candidate.code === componentCode);
+    if (!component) component = await operator.people.createComponent({ ventureId, code: componentCode, name: "VALIDATION-ONLY fixed earning", kind: "earning", calculationMethod: "flat_amount", defaultAmount: 100, currency: "USD", effectiveFrom: "2026-08-24", calculationInputs: { internalInput: 100, jurisdictionNeutral: true, noStatutoryDetermination: true } });
+    if (profile.status === "draft") await expect(operator.people.transitionProfile({ ventureId, employeeProfileId: profile.id, targetStatus: "active" })).rejects.toThrow();
+    if (component.status === "draft") await expect(operator.people.transitionComponent({ ventureId, compensationComponentId: component.id, targetStatus: "active" })).rejects.toThrow();
+    if (profile.status === "draft") await admin.people.transitionProfile({ ventureId, employeeProfileId: profile.id, targetStatus: "active" });
+    if (component.status === "draft") await admin.people.transitionComponent({ ventureId, compensationComponentId: component.id, targetStatus: "active" });
+    const profiles = await admin.people.profiles({ ventureId }); const components = await admin.people.components({ ventureId }); const audits = await admin.audit({ ventureId });
+    expect(profiles.find(candidate => candidate.id === profile!.id)?.status).toBe("active");
+    expect(components.find(candidate => candidate.id === component!.id)?.status).toBe("active");
+    expect(audits.some(event => event.eventType === "people.employee_profile_transitioned")).toBe(true);
+    expect(audits.some(event => event.eventType === "people.compensation_component_transitioned")).toBe(true);
+  }, 20_000);
 });

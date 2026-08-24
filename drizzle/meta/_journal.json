@@ -78,6 +78,13 @@
       "when": 1787548933859,
       "tag": "0010_loose_raza",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1787550149751,
+      "tag": "0011_faithful_paper_doll",
+      "breakpoints": true
     }
   ]
 }

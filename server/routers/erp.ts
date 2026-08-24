@@ -3,6 +3,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { requireVentureMembership, requireVentureRole } from "../platform/tenant";
 import * as erp from "../erp/service";
 import * as asia from "../erp/asia";
+import * as people from "../erp/people";
 import { calculatePayrollProposal } from "../erp/policy";
 
 const ventureInput = z.object({ ventureId: z.number().int().positive() });
@@ -28,6 +29,14 @@ export const erpRouter = router({
   master: router({
     list: protectedProcedure.input(ventureInput.extend({ domain: z.enum(masterDomains).optional() })).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return erp.listMasterRecords(input.ventureId, input.domain); }),
     create: protectedProcedure.input(ventureInput.extend({ domain: z.enum(masterDomains), code: z.string().trim().min(1).max(96), name: z.string().trim().min(1).max(180), attributes: z.record(z.string(), z.unknown()).default({}) })).mutation(async ({ ctx, input }) => { await requireOperationalRole(ctx.user.id, input.ventureId); return erp.createMasterRecord({ ...input, createdByUserId: ctx.user.id }); }),
+  }),
+  people: router({
+    profiles: protectedProcedure.input(ventureInput).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return people.listEmployeeProfiles(input.ventureId); }),
+    createProfile: protectedProcedure.input(ventureInput.extend({ employeeMasterId: z.number().int().positive(), employeeNumber: z.string().trim().min(1).max(96), department: z.string().trim().max(120).optional(), positionTitle: z.string().trim().min(1).max(140), employmentType: z.enum(workerCategories), startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), calculationInputs: z.record(z.string(), z.unknown()).default({}) })).mutation(async ({ ctx, input }) => { await requireOperationalRole(ctx.user.id, input.ventureId); return people.createEmployeeProfile({ ...input, createdByUserId: ctx.user.id }); }),
+    transitionProfile: protectedProcedure.input(ventureInput.extend({ employeeProfileId: z.number().int().positive(), targetStatus: z.enum(["draft", "active", "on_leave", "terminated"]) })).mutation(async ({ ctx, input }) => { const membership = await requireOperationalRole(ctx.user.id, input.ventureId); requireVentureRole(membership.role, ["portfolio_admin", "venture_lead"]); return people.transitionEmployeeProfile({ ...input, actorUserId: ctx.user.id }); }),
+    components: protectedProcedure.input(ventureInput).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return people.listCompensationComponents(input.ventureId); }),
+    createComponent: protectedProcedure.input(ventureInput.extend({ code: z.string().trim().min(1).max(96), name: z.string().trim().min(1).max(180), kind: z.enum(["earning", "deduction"]), calculationMethod: z.enum(["flat_amount", "percentage", "manual"]), defaultAmount: z.number().nonnegative(), currency: z.string().trim().regex(/^[A-Za-z]{3}$/), effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), effectiveTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), calculationInputs: z.record(z.string(), z.unknown()).default({}) })).mutation(async ({ ctx, input }) => { await requireOperationalRole(ctx.user.id, input.ventureId); return people.createCompensationComponent({ ...input, createdByUserId: ctx.user.id }); }),
+    transitionComponent: protectedProcedure.input(ventureInput.extend({ compensationComponentId: z.number().int().positive(), targetStatus: z.enum(["draft", "active", "retired"]) })).mutation(async ({ ctx, input }) => { const membership = await requireOperationalRole(ctx.user.id, input.ventureId); requireVentureRole(membership.role, ["portfolio_admin", "venture_lead", "finance_lead"]); return people.transitionCompensationComponent({ ...input, actorUserId: ctx.user.id }); }),
   }),
   currencyPolicy: router({
     get: protectedProcedure.input(ventureInput).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return erp.getVentureCurrencyPolicy(input.ventureId); }),

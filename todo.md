@@ -99,3 +99,6 @@
 - [x] Add authenticated multi-role typed-route coverage that proves allowed and forbidden behavior for at least two distinct active venture roles beyond unaffiliated membership denial.
 - [x] Implement explicit reporting-currency support and policy controls, or narrow the multi-currency roadmap claim to the existing transaction/functional-currency and approved-FX controls.
 - [x] Add tenant reporting-currency configuration plus approved-rate-backed reporting amounts on operational records, with audit evidence and no external financial execution.
+- [x] Extend Work Control with explicit employee-profile and compensation-component templates plus a jurisdiction-neutral calculation-input field, then validate lifecycle evidence across people, projects, assets, service, and CRM without claiming statutory payroll compliance.
+- [x] Implement dedicated employee and compensation-component controls with domain-specific fields, validation, lifecycle/audit behavior, and role guards beyond generic operational records.
+- [ ] Implement specialized project/task, asset/maintenance, service-request, and CRM-opportunity workflows with explicit domain states, validation, audit evidence, and responsive UI behavior beyond shared record templates.
