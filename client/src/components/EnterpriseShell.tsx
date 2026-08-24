@@ -21,6 +21,7 @@ const navigation = [
   { path: "/work", label: "Work control", icon: Workflow },
   { path: "/cash", label: "Cash control", icon: Landmark },
   { path: "/insights", label: "Operational insights", icon: LayoutDashboard },
+  { path: "/automation", label: "Automation workbench", icon: GitBranch },
   { path: "/asia", label: "Asia operations", icon: Globe2 },
   { path: "/cross-border", label: "Cross-border finance", icon: ArrowRightLeft },
   { path: "/decisions", label: "Decision governance", icon: Scale },

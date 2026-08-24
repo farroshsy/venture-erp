@@ -31,6 +31,7 @@ vi.mock("../erp/service", () => ({
   createWorkflowDefinition: vi.fn(),
   activateWorkflowDefinition: vi.fn(),
   startWorkflow: vi.fn(),
+  listWorkflowInstances: vi.fn(),
   listWorkflowTasks: vi.fn(),
   completeWorkflowTask: vi.fn(),
   listAuditEvents: vi.fn(),
@@ -81,6 +82,15 @@ describe("operational ERP router", () => {
     vi.mocked(service.listOperationalRecords).mockResolvedValue([]);
     await expect(caller().records.list({ ventureId: 21 })).resolves.toEqual([]);
     expect(requireVentureMembership).toHaveBeenCalledWith(7, 21);
+  });
+  it("lists workflow instances and forwards a rejected task outcome through tenant-scoped workflow contracts", async () => {
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "operator", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.listWorkflowInstances).mockResolvedValue([{ id: 88, ventureId: 21, workflowDefinitionId: 17, status: "active" }] as never);
+    vi.mocked(service.completeWorkflowTask).mockResolvedValue({ id: 99, status: "rejected" } as never);
+    await expect(caller().workflow.instances({ ventureId: 21 })).resolves.toMatchObject([{ id: 88, workflowDefinitionId: 17 }]);
+    await expect(caller().workflow.completeTask({ ventureId: 21, workflowTaskId: 99, outcome: "rejected" })).resolves.toMatchObject({ status: "rejected" });
+    expect(service.listWorkflowInstances).toHaveBeenCalledWith(21);
+    expect(service.completeWorkflowTask).toHaveBeenCalledWith({ ventureId: 21, workflowTaskId: 99, outcome: "rejected", actorUserId: 7 });
   });
   it("requires an operational role before creating a transaction", async () => {
     vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "viewer", status: "active", createdAt: new Date(), updatedAt: new Date() });

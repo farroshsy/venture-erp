@@ -115,3 +115,11 @@ The authenticated Operational Insights workspace rendered only persisted validat
 The route registry now lazy-loads operational workspaces and separates React, UI, data/runtime, and remaining vendor code. The production build now emits an entry chunk of approximately `35.5 kB` and a largest vendor chunk of approximately `401.0 kB`, with all routed operational pages emitted as separate chunks; the previous 500 kB advisory no longer appears.
 
 The receivables, internal-payment-evidence, operational-insights, and performance increment passed TypeScript checking, the 52-test suite, eight integration tests, contract validation, foundation verification, and a production build with route and vendor chunks.
+
+### Visual automation workbench
+
+The real workflow service path was exercised in the authorized validation venture with an explicitly labelled visual automation definition. `validation_visual_automation_20260824` was persisted, activated, started, and completed through its assigned human task `30001`, which ended with status `approved`. The instance context was explicitly marked validation-only with no external effect; no webhook, script, payment, filing, provider call, or external transmission was involved.
+
+The lazy-loaded Automation Workbench route resolved successfully in the authenticated validation venture and listed the three persisted validation definitions. Its initial canvas state correctly required selecting a saved definition before rendering a process diagram or live task evidence.
+
+The completed Workbench now selects the newest saved definition after load and rendered the isolated rejection-path definition `validation_visual_automation_rejection_20260824`. The page showed its three-node directed process, active status, instance `60001` with status `rejected`, task `60001` assigned to user `1` with status `rejected`, and the related workflow audit sequence: `workflow.created`, `workflow.activated`, `workflow.started`, and `workflow.task_completed`. Focused router coverage also proved tenant-scoped instance listing and forwarding of a rejected task outcome with the authenticated actor identity. This proof is internal, validation-only, and produced no external side effect.

@@ -22,6 +22,7 @@ const ProcurementControl = lazy(() => import("./pages/ProcurementControl"));
 const WorkControl = lazy(() => import("./pages/WorkControl"));
 const CashControl = lazy(() => import("./pages/CashControl"));
 const OperationalInsights = lazy(() => import("./pages/OperationalInsights"));
+const AutomationWorkbench = lazy(() => import("./pages/AutomationWorkbench"));
 const ModuleCatalog = lazy(() => import("./pages/ModuleCatalog"));
 const OperationsWorkspace = lazy(() => import("./pages/OperationsWorkspace"));
 const PortfolioDashboard = lazy(() => import("./pages/PortfolioDashboard"));
@@ -43,6 +44,7 @@ function Router() {
       <Route path={"/work"} component={WorkControl} />
       <Route path={"/cash"} component={CashControl} />
       <Route path={"/insights"} component={OperationalInsights} />
+      <Route path={"/automation"} component={AutomationWorkbench} />
       <Route path={"/asia"} component={AsiaOperations} />
       <Route path={"/cross-border"} component={CrossBorderFinance} />
       <Route path={"/decisions"} component={DecisionGovernance} />

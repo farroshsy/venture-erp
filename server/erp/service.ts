@@ -431,6 +431,11 @@ export async function listWorkflowTasks(ventureId: number) {
   return db.select().from(erpWorkflowTasks).where(eq(erpWorkflowTasks.ventureId, ventureId)).orderBy(desc(erpWorkflowTasks.createdAt));
 }
 
+export async function listWorkflowInstances(ventureId: number) {
+  const db = await requireDb();
+  return db.select().from(erpWorkflowInstances).where(eq(erpWorkflowInstances.ventureId, ventureId)).orderBy(desc(erpWorkflowInstances.createdAt));
+}
+
 export async function listAuditEvents(ventureId: number) {
   const db = await requireDb();
   return db.select().from(erpAuditEvents).where(eq(erpAuditEvents.ventureId, ventureId)).orderBy(desc(erpAuditEvents.createdAt));

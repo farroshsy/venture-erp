@@ -81,3 +81,7 @@
 - [x] Add a domain-specific work-management control workspace for people, projects, assets, service, and CRM records using the live tenant-scoped lifecycle and audit APIs.
 - [x] Implement tenant-scoped receivable, payable, and internal payment-record controls with counterparty, invoice-linkage, open-balance, audit, and no-execution safeguards.
 - [x] Implement a tenant-scoped operational-insights dashboard sourced from real financial, invoice, inventory, procurement, work, workflow, and audit records.
+- [x] Implement a visual, tenant-scoped BPMN-style automation workbench with persisted templates, controlled activation, human approval tasks, rejection/exception evidence, and no external side effects.
+- [x] Add Automation Workbench views for live workflow instances and pending tasks with assignee and status evidence.
+- [x] Add in-workbench approve, reject, and complete actions that use the tenant-scoped task contract and surface resulting status and audit evidence without external side effects.
+- [x] Add focused rejection-path proof showing exception evidence is visible and auditable in the Automation Workbench.
