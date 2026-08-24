@@ -44,20 +44,20 @@
 - [x] Assess the referenced competitor and classify its capabilities into immediately buildable ERP workflows, integration-dependent features, and regulated or jurisdiction-specific controls.
 - [x] Define an operational ERP coverage matrix across general ledger, tax configuration, budgets, sales, procurement, inventory, people, payroll, projects, assets, service, CRM, analytics, supply chain, manufacturing, integrations, and IoT-adjacent telemetry.
 - [x] Implement a shared ERP operational core with venture-scoped master data, accounting periods, configurable tax policies, budget envelopes, audit events, approval policies, and BPMN-style workflow definitions.
-- [ ] Implement functional general-ledger journals, account structure, period controls, receivables, payables, and invoice-to-payment workflow records.
-- [ ] Implement functional customer, sales-order, procurement-request, purchase-order, supplier, item, inventory movement, and stock-reservation records with transaction-safe state changes.
+- [x] Implement functional general-ledger journals, account structure, period controls, receivables, payables, and invoice-to-payment workflow records.
+- [x] Implement functional customer, sales-order, procurement-request, purchase-order, supplier, item, inventory movement, and stock-reservation records with transaction-safe state changes.
 - [ ] Implement functional employee, compensation component, payroll-run, project, task, asset, maintenance, service request, and CRM opportunity records with jurisdiction-neutral calculation inputs.
-- [ ] Implement an automation workbench for configurable event, approval, task, and exception workflows, with a BPMN-style visual process model and auditable state transitions.
+- [x] Implement an automation workbench for configurable event, approval, task, and exception workflows, with a BPMN-style visual process model and auditable state transitions.
 - [ ] Implement operating dashboards for financial posture, tax/budget utilization, supply/inventory, people/payroll, delivery/projects, assets/service, and venture portfolio analytics using real operational records.
 - [x] Define and enforce country/jurisdiction boundaries for tax, payroll, public-sector budgeting, banking, statutory reporting, and external integration automation; do not hardcode legal rates or submit filings.
 - [ ] Add end-to-end tests for transactional workflows, automation state transitions, tenant isolation, role permissions, and audit-event creation.
 - [x] Update documentation with the operational ERP architecture, feature coverage, competitor-gap analysis, automation model, compliance boundaries, and phased roadmap to broader parity.
-- [ ] Validate real operational workflows, mobile/desktop UX, access lifecycle, and database integrity; record outstanding integration and regulatory prerequisites.
-- [ ] Capture the operational ERP transformation in a reviewable checkpoint.
-- [ ] Capture the completed enterprise-platform upgrade in a reviewable checkpoint.
+- [x] Validate real operational workflows, mobile/desktop UX, access lifecycle, and database integrity; record outstanding integration and regulatory prerequisites.
+- [x] Capture the operational ERP transformation in a reviewable checkpoint.
+- [x] Capture the completed enterprise-platform upgrade in a reviewable checkpoint.
 - [x] Define the Asia jurisdiction-pack strategy for Indonesia, Singapore, Malaysia, Japan, South Korea, China, Taiwan, and Hong Kong, including a no-hardcoded-law policy and specialist validation gates.
 - [x] Define the public-sector budgeting model for national, provincial/state, municipal/local, and agency/program levels without representing a jurisdiction-specific appropriation rule as universal.
-- [ ] Add multi-currency reference data and monetary policy controls for Asian operating currencies, transaction currency, functional currency, reporting currency, and controlled exchange-rate sources.
+- [x] Add multi-currency reference data and monetary policy controls for Asian operating currencies, transaction currency, functional currency, reporting currency, and controlled exchange-rate sources.
 - [x] Add configurable payroll calendars, worker categories, compensation components, withholding inputs, and country-pack eligibility controls without claiming statutory compliance until a reviewed pack is activated.
 - [x] Add a sandbox integration registry and adapter contracts for banking, attendance, e-invoicing, POS, tax-filing, and statutory-reporting providers without connecting a live financial or government account.
 - [x] Implement multi-currency accounting, controlled exchange-rate conversion, public-sector budget hierarchy, payroll-run records, and country-pack applicability checks.
@@ -94,3 +94,6 @@
 - [x] Add explicit, tenant-scoped operational-record event triggers to active BPMN workflow definitions so approved records can start a human-gated workflow with durable audit evidence and no external side effect.
 - [x] Add a read-only database integration test that verifies the authorized validation venture’s real sales-order reservation, internal fulfillment, event-triggered workflow instance, pending human task, audit evidence, and absence from a separate tenant boundary.
 - [x] Add a controlled procurement-request lifecycle and approved request-to-purchase-order conversion path with supplier validation, duplicate-conversion prevention, audit evidence, and no supplier payment or external procurement action.
+- [ ] Add automated end-to-end coverage that exercises authenticated role-permission enforcement, transactional state transitions, automation task completion, tenant isolation, and resulting audit-event creation in executable validation flows.
+- [x] Implement explicit reporting-currency support and policy controls, or narrow the multi-currency roadmap claim to the existing transaction/functional-currency and approved-FX controls.
+- [x] Add tenant reporting-currency configuration plus approved-rate-backed reporting amounts on operational records, with audit evidence and no external financial execution.

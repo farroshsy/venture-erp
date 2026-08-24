@@ -116,10 +116,10 @@ export async function listBudgetEnvelopes(ventureId: number) {
   return db.select().from(erpBudgetEnvelopes).where(eq(erpBudgetEnvelopes.ventureId, ventureId)).orderBy(desc(erpBudgetEnvelopes.updatedAt));
 }
 
-export async function createOperationalRecord(input: { ventureId: number; domain: OperationalDomain; recordType: string; recordNumber: string; title: string; counterpartyMasterId?: number; accountingPeriodId?: number; budgetEnvelopeId?: number; publicBudgetNodeId?: number; taxPolicyId?: number; transactionCurrency?: string; functionalCurrency?: string; exchangeRateId?: number; amount: number; effectiveDate: string; dueDate?: string; data: Record<string, unknown>; createdByUserId: number }) {
+export async function createOperationalRecord(input: { ventureId: number; domain: OperationalDomain; recordType: string; recordNumber: string; title: string; counterpartyMasterId?: number; accountingPeriodId?: number; budgetEnvelopeId?: number; publicBudgetNodeId?: number; taxPolicyId?: number; transactionCurrency?: string; functionalCurrency?: string; exchangeRateId?: number; reportingExchangeRateId?: number; amount: number; effectiveDate: string; dueDate?: string; data: Record<string, unknown>; createdByUserId: number }) {
   const db = await requireDb();
   const amount = normalizeMoney(input.amount);
-  const ventureRows = await db.select({ baseCurrency: ventures.baseCurrency }).from(ventures).where(eq(ventures.id, input.ventureId)).limit(1);
+  const ventureRows = await db.select({ baseCurrency: ventures.baseCurrency, reportingCurrency: ventures.reportingCurrency }).from(ventures).where(eq(ventures.id, input.ventureId)).limit(1);
   const baseCurrency = ventureRows[0]?.baseCurrency;
   if (!baseCurrency) throw new Error("Active venture not found.");
   const transactionCurrency = (input.transactionCurrency ?? baseCurrency).toUpperCase();
@@ -136,13 +136,34 @@ export async function createOperationalRecord(input: { ventureId: number; domain
   const tax = taxPolicy ? calculateTax(amount, taxPolicy.rateBasisPoints, taxPolicy.calculationMethod, taxPolicy.configuration) : { taxAmount: 0, totalAmount: amount };
   const exchangeRate = transactionCurrency === functionalCurrency ? undefined : await requireApprovedExchangeRate(db, input.ventureId, input.exchangeRateId, transactionCurrency, functionalCurrency);
   const functionalAmount = exchangeRate ? convertCurrency(tax.totalAmount, Number(exchangeRate.rate)) : tax.totalAmount;
+  const reportingCurrency = (ventureRows[0]?.reportingCurrency ?? functionalCurrency).toUpperCase();
+  const reportingExchangeRate = functionalCurrency === reportingCurrency ? undefined : await requireApprovedExchangeRate(db, input.ventureId, input.reportingExchangeRateId, functionalCurrency, reportingCurrency);
+  const reportingAmount = reportingExchangeRate ? convertCurrency(functionalAmount, Number(reportingExchangeRate.rate)) : functionalAmount;
   const publicBudgetAvailable = publicBudgetNode ? availableBudget(Number(publicBudgetNode.appropriatedAmount), Number(publicBudgetNode.committedAmount), Number(publicBudgetNode.spentAmount)) : Number.POSITIVE_INFINITY;
   const budgetException = tax.totalAmount > budgetAvailable || functionalAmount > publicBudgetAvailable;
   const status: OperationalStatus = budgetException ? "pending_approval" : "draft";
-  const result = await db.insert(erpOperationalRecords).values({ ...input, status, amount: String(amount), taxAmount: String(tax.taxAmount), totalAmount: String(tax.totalAmount), transactionCurrency, functionalCurrency, exchangeRateId: exchangeRate?.id, functionalAmount: String(functionalAmount) });
+  const result = await db.insert(erpOperationalRecords).values({ ...input, status, amount: String(amount), taxAmount: String(tax.taxAmount), totalAmount: String(tax.totalAmount), transactionCurrency, functionalCurrency, exchangeRateId: exchangeRate?.id, functionalAmount: String(functionalAmount), reportingCurrency, reportingExchangeRateId: reportingExchangeRate?.id, reportingAmount: String(reportingAmount) });
   const id = Number(result[0].insertId);
-  await createAuditEvent({ ventureId: input.ventureId, domain: input.domain, operationalRecordId: id, eventType: "record.created", actorUserId: input.createdByUserId, payload: { recordNumber: input.recordNumber, status, amount, taxAmount: tax.taxAmount, totalAmount: tax.totalAmount, transactionCurrency, functionalCurrency, functionalAmount, exchangeRateId: exchangeRate?.id ?? null, budgetException } });
-  return { id, ...input, status, amount, taxAmount: tax.taxAmount, totalAmount: tax.totalAmount, transactionCurrency, functionalCurrency, functionalAmount, exchangeRateId: exchangeRate?.id, budgetException };
+  await createAuditEvent({ ventureId: input.ventureId, domain: input.domain, operationalRecordId: id, eventType: "record.created", actorUserId: input.createdByUserId, payload: { recordNumber: input.recordNumber, status, amount, taxAmount: tax.taxAmount, totalAmount: tax.totalAmount, transactionCurrency, functionalCurrency, functionalAmount, exchangeRateId: exchangeRate?.id ?? null, reportingCurrency, reportingAmount, reportingExchangeRateId: reportingExchangeRate?.id ?? null, budgetException, noExternalExecution: true } });
+  return { id, ...input, status, amount, taxAmount: tax.taxAmount, totalAmount: tax.totalAmount, transactionCurrency, functionalCurrency, functionalAmount, exchangeRateId: exchangeRate?.id, reportingCurrency, reportingAmount, reportingExchangeRateId: reportingExchangeRate?.id, budgetException };
+}
+
+export async function getVentureCurrencyPolicy(ventureId: number) {
+  const db = await requireDb();
+  const [venture] = await db.select({ id: ventures.id, baseCurrency: ventures.baseCurrency, reportingCurrency: ventures.reportingCurrency }).from(ventures).where(eq(ventures.id, ventureId)).limit(1);
+  if (!venture) throw new Error("Active venture not found.");
+  return { ventureId: venture.id, baseCurrency: venture.baseCurrency, reportingCurrency: venture.reportingCurrency ?? venture.baseCurrency };
+}
+
+export async function setVentureReportingCurrency(input: { ventureId: number; reportingCurrency: string; actorUserId: number }) {
+  const db = await requireDb();
+  const reportingCurrency = input.reportingCurrency.trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(reportingCurrency)) throw new Error("Reporting currency must be a three-letter currency code.");
+  const [venture] = await db.select({ id: ventures.id, baseCurrency: ventures.baseCurrency }).from(ventures).where(eq(ventures.id, input.ventureId)).limit(1);
+  if (!venture) throw new Error("Active venture not found.");
+  await db.update(ventures).set({ reportingCurrency }).where(eq(ventures.id, input.ventureId));
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: "currency.reporting_policy_set", actorUserId: input.actorUserId, payload: { baseCurrency: venture.baseCurrency, reportingCurrency, noExternalExecution: true } });
+  return { ventureId: input.ventureId, baseCurrency: venture.baseCurrency, reportingCurrency };
 }
 
 export type InvoiceType = "receivable_invoice" | "payable_invoice";

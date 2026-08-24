@@ -6,6 +6,8 @@ vi.mock("../erp/service", () => ({
   getOperationalDashboard: vi.fn(),
   listMasterRecords: vi.fn(),
   createMasterRecord: vi.fn(),
+  getVentureCurrencyPolicy: vi.fn(),
+  setVentureReportingCurrency: vi.fn(),
   listAccountingPeriods: vi.fn(),
   createAccountingPeriod: vi.fn(),
   closeAccountingPeriod: vi.fn(),
@@ -85,6 +87,15 @@ describe("operational ERP router", () => {
     vi.mocked(service.listOperationalRecords).mockResolvedValue([]);
     await expect(caller().records.list({ ventureId: 21 })).resolves.toEqual([]);
     expect(requireVentureMembership).toHaveBeenCalledWith(7, 21);
+  });
+  it("returns and updates reporting-currency policy only inside the authorized venture", async () => {
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(service.getVentureCurrencyPolicy).mockResolvedValue({ ventureId: 21, baseCurrency: "IDR", reportingCurrency: "USD" } as never);
+    vi.mocked(service.setVentureReportingCurrency).mockResolvedValue({ ventureId: 21, baseCurrency: "IDR", reportingCurrency: "USD" } as never);
+    await expect(caller().currencyPolicy.get({ ventureId: 21 })).resolves.toMatchObject({ reportingCurrency: "USD" });
+    await expect(caller().currencyPolicy.setReportingCurrency({ ventureId: 21, reportingCurrency: "USD" })).resolves.toMatchObject({ reportingCurrency: "USD" });
+    expect(service.setVentureReportingCurrency).toHaveBeenCalledWith({ ventureId: 21, reportingCurrency: "USD", actorUserId: 7 });
   });
   it("lists workflow instances and forwards a rejected task outcome through tenant-scoped workflow contracts", async () => {
     vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "operator", status: "active", createdAt: new Date(), updatedAt: new Date() });
