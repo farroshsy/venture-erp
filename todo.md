@@ -46,7 +46,7 @@
 - [x] Implement a shared ERP operational core with venture-scoped master data, accounting periods, configurable tax policies, budget envelopes, audit events, approval policies, and BPMN-style workflow definitions.
 - [x] Implement functional general-ledger journals, account structure, period controls, receivables, payables, and invoice-to-payment workflow records.
 - [x] Implement functional customer, sales-order, procurement-request, purchase-order, supplier, item, inventory movement, and stock-reservation records with transaction-safe state changes.
-- [ ] Implement functional employee, compensation component, payroll-run, project, task, asset, maintenance, service request, and CRM opportunity records with jurisdiction-neutral calculation inputs.
+- [x] Implement functional employee, compensation component, payroll-run, project, task, asset, maintenance, service request, and CRM opportunity records with jurisdiction-neutral calculation inputs.
 - [x] Implement an automation workbench for configurable event, approval, task, and exception workflows, with a BPMN-style visual process model and auditable state transitions.
 - [ ] Implement operating dashboards for financial posture, tax/budget utilization, supply/inventory, people/payroll, delivery/projects, assets/service, and venture portfolio analytics using real operational records.
 - [x] Define and enforce country/jurisdiction boundaries for tax, payroll, public-sector budgeting, banking, statutory reporting, and external integration automation; do not hardcode legal rates or submit filings.
@@ -105,4 +105,4 @@
 - [x] Implement dedicated service-request and CRM-opportunity records with normalized tenancy, domain-specific lifecycle validation, audit events, role guards, responsive UI, and typed-route integration evidence.
 - [x] Implement dedicated project/task and asset/maintenance records with normalized tenancy, domain-specific lifecycle validation, audit events, role guards, responsive UI, and typed-route integration evidence.
 - [x] Add real typed-route integration evidence for project, task, asset, and maintenance lifecycles with operator proposal, approver-gated activation, tenant isolation, and audit assertions.
-- [ ] Add explicit jurisdiction-neutral calculation-input fields and contracts to dedicated project/task, asset/maintenance, service-request, and CRM-opportunity records, with validation, UI capture, persistence, audit evidence, and focused typed-route proof.
+- [x] Add explicit jurisdiction-neutral calculation-input fields and contracts to dedicated project/task, asset/maintenance, service-request, and CRM-opportunity records, with validation, UI capture, persistence, audit evidence, and focused typed-route proof.
