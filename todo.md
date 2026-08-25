@@ -135,3 +135,4 @@
 - [x] Add a read-only simulation interface showing source/rule/dimension/allocation derivations, balancing, warnings, and an explicit no-accounting-impact boundary.
 - [x] Implement immutable procurement-receipt calculation evidence with canonical input/output hashes, predecessor hash chaining, metadata-only review state, and no posting or external effect.
 - [x] Add independent double-entry, allocation-total, and residual invariants plus a read-only calculation-evidence review surface; defer valuation, COGS, FX revaluation, investment, and payroll calculations.
+- [x] Draft a disabled proposal-to-journal conversion design with fail-closed prerequisites, immutable linkage, and no implementation or posting path.

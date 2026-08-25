@@ -1,5 +1,8 @@
 # Validation Notes
 
+### Disabled proposal-to-journal conversion design
+`docs/architecture/DISABLED-PROPOSAL-TO-JOURNAL-CONVERSION-DESIGN.md` now documents the future accounting-control seam without implementing it. It specifies fail-closed tenant, authorization, approved-proposal, hash-chain, invariant, rule, period, account, currency, amount, dimension, and idempotency prerequisites; immutable source linkage; refusal evidence; and a required separation between future draft creation and the existing separately authorized journal-posting action. No migration, table, typed route, service method, user-interface action, journal conversion, journal creation, posting, balance mutation, payment, tax/payroll calculation, filing, integration, or external effect was added. The Indonesian payroll pack remains draft-only and blocked pending qualified reviewer evidence.
+
 ### Immutable calculation-evidence validation
 Migration `0019_handy_bromley.sql` is physically applied and adds tenant-scoped append-only calculation evidence. Journal Control now separates the existing read-only simulation from an explicit finance-authorized **Calculate immutable evidence** action. Fresh desktop and 375-pixel mobile captures show the action, retained calculation register, hash-chain posture, completed and refused evidence entries, and predecessor/record hashes without horizontal clipping. The visible control states that it cannot create a journal, journal number, ledger balance, payment, tax result, payroll result, filing, workflow, integration, or external effect.
 
