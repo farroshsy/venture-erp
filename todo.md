@@ -121,3 +121,6 @@
 - [x] Correct the internal invoice-aging view to separate buckets by retained transaction currency and prohibit cross-currency amount aggregation without approved FX/reporting evidence.
 - [x] Harden payable supplier-invoice-reference duplicate prevention with database-backed same-venture/same-supplier uniqueness and safe legacy-reference backfill, while retaining no external effect.
 - [x] Record tenant-scoped internal audit evidence when a payable supplier-invoice-reference duplicate is rejected, without storing the attempted raw reference or creating an external effect.
+- [x] Design immutable tenant-scoped internal accounting-event and finance-owned effective-dated posting-rule schemas that produce balanced journal proposals only, with human approval and no automatic external effect.
+- [x] Draft the finance-owned posting-rule configuration interface for Accounting Event → Posting Rule → Journal Proposal control.
+- [x] Generate an architecture presentation script for the Accounting Event → Posting Rule → Journal Proposal control engine.
