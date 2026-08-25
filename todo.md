@@ -120,3 +120,4 @@
 - [x] Add a tenant-scoped internal receivable/payable aging view based on retained open invoice evidence, with no collections, disbursements, credit decision, or external effect.
 - [x] Correct the internal invoice-aging view to separate buckets by retained transaction currency and prohibit cross-currency amount aggregation without approved FX/reporting evidence.
 - [x] Harden payable supplier-invoice-reference duplicate prevention with database-backed same-venture/same-supplier uniqueness and safe legacy-reference backfill, while retaining no external effect.
+- [x] Record tenant-scoped internal audit evidence when a payable supplier-invoice-reference duplicate is rejected, without storing the attempted raw reference or creating an external effect.

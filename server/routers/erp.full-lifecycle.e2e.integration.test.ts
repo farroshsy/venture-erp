@@ -130,6 +130,9 @@ describe("typed-route sales lifecycle with real authorization", () => {
     const retained = records.find(record => record.id === invoice!.id)!;
     expect(retained.data).toMatchObject({ supplierInvoiceReference: supplierReference, supplierInvoiceReferenceNormalized: supplierReference });
     expect(audits.some(event => event.operationalRecordId === invoice!.id && event.eventType === "payable_invoice.supplier_reference_recorded")).toBe(true);
+    const duplicateRejection = audits.find(event => event.eventType === "payable_invoice.duplicate_supplier_reference_rejected" && event.operationalRecordId === invoice!.id);
+    expect(duplicateRejection?.payload).toMatchObject({ supplierMasterId: supplier.id, duplicateOperationalRecordId: invoice!.id, attemptedReferencePresent: true, attemptedReferenceRawValueStored: false, noExternalSupplierAction: true, noPaymentExecution: true });
+    expect(JSON.stringify(duplicateRejection?.payload)).not.toContain(supplierReference);
   }, 20_000);
 
   it("returns aging from retained internal invoice evidence without creating a collection, disbursement, or external action", async () => {
