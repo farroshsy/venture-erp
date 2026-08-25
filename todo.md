@@ -112,3 +112,4 @@
 - [x] Add explicit jurisdiction-neutral calculation-input fields and contracts to dedicated project/task, asset/maintenance, service-request, and CRM-opportunity records, with validation, UI capture, persistence, audit evidence, and focused typed-route proof.
 - [x] Incorporate the user-supplied Indonesian payroll/tax review-status wording and official DJP Article 21/26 technical source into the draft evidence pack without changing its unreviewed, inactive, or non-calculating boundary.
 - [x] Add the user-supplied source-placeholder note and structured pending-approval status to the Indonesian payroll draft evidence pack, retaining only qualified-reviewer-authorized paths to payroll use.
+- [ ] Await written, effective-dated approval from a qualified Indonesian payroll/tax reviewer before changing the pack’s unreviewed draft status, selecting it for payroll, or resuming the payroll rehearsal.
