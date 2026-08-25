@@ -112,6 +112,24 @@ describe("typed-route sales lifecycle with real authorization", () => {
     expect(audits.some(event => event.operationalRecordId === mismatchedInvoice!.id && event.eventType === "payable_invoice.three_way_match_evaluated")).toBe(true);
   }, 20_000);
 
+  it("retains a supplier invoice reference once per active supplier and venture, rejects a duplicate, and records only internal evidence", async () => {
+    const operator = callerFor(operatorUserId, operatorOpenId); const admin = callerFor(1, "owner");
+    const supplierCode = "VALIDATION-E2E-SUPPLIER-REFERENCE-SUPPLIER-20260825";
+    const invoiceNumber = "VALIDATION-E2E-SUPPLIER-REFERENCE-AP-20260825";
+    const duplicateNumber = "VALIDATION-E2E-SUPPLIER-REFERENCE-DUP-20260825";
+    const supplierReference = "VALIDATION-E2E-SUPPLIER-REF-20260825";
+    const masters = await operator.master.list({ ventureId });
+    let supplier = masters.find(master => master.domain === "supplier" && master.code === supplierCode);
+    if (!supplier) supplier = await operator.master.create({ ventureId, domain: "supplier", code: supplierCode, name: "VALIDATION-ONLY supplier reference supplier", attributes: { validationOnly: true, noExternalSupplierAction: true } });
+    let invoice = (await admin.invoice.settlements({ ventureId })).find(item => item.invoice.recordNumber === invoiceNumber)?.invoice;
+    if (!invoice) invoice = await operator.invoice.create({ ventureId, invoiceType: "payable_invoice", recordNumber: invoiceNumber, title: "VALIDATION-ONLY supplier invoice reference", counterpartyMasterId: supplier.id, amount: 25, effectiveDate: "2026-08-25", supplierInvoiceReference: supplierReference, data: { validationOnly: true, noExternalDisbursement: true } });
+    await expect(operator.invoice.create({ ventureId, invoiceType: "payable_invoice", recordNumber: duplicateNumber, title: "VALIDATION-ONLY duplicate supplier reference", counterpartyMasterId: supplier.id, amount: 25, effectiveDate: "2026-08-25", supplierInvoiceReference: supplierReference.toLowerCase(), data: { validationOnly: true, noExternalDisbursement: true } })).rejects.toThrow("already exists");
+    const records = await admin.records.list({ ventureId }); const audits = await admin.audit({ ventureId });
+    const retained = records.find(record => record.id === invoice!.id)!;
+    expect(retained.data).toMatchObject({ supplierInvoiceReference: supplierReference, supplierInvoiceReferenceNormalized: supplierReference });
+    expect(audits.some(event => event.operationalRecordId === invoice!.id && event.eventType === "payable_invoice.supplier_reference_recorded")).toBe(true);
+  }, 20_000);
+
   it("persists explicit jurisdiction-neutral people, delivery, asset, service, and CRM work controls with approval evidence", async () => {
     const operator = callerFor(operatorUserId, operatorOpenId);
     const workControls = [

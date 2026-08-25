@@ -22,6 +22,8 @@ For a payable invoice, approval now additionally requires a successful **interna
 
 The Cash Control workspace also exposes a dedicated `approveMatchedPayable` action. It is limited to portfolio administrators, venture leads, and finance leads; it accepts only a `pending_approval` payable invoice whose retained match result is `matched`, then applies the ordinary tenant-scoped `approved` transition. The action therefore does not create a second lifecycle or bypass the underlying guard. Its approval note explicitly records that the result is internal evidence only and carries no payment or external effect.
 
+For payable intake, the workspace requires a supplier invoice reference. The server normalizes that reference for comparison and rejects a second payable invoice in the same venture for the same supplier with the same normalized reference. It persists both the entered and normalized reference on the retained internal record and emits `payable_invoice.supplier_reference_recorded`. The constraint deliberately has no cross-venture effect and does not send a supplier message, inspect a supplier portal, execute a payment, or make a tax or compliance determination.
+
 > A posted internal payment record is **evidence of a controlled accounting event**, not proof that a bank, processor, or government authority accepted or executed a transaction.
 
 > A matched payable invoice is **approval eligibility evidence only**. It is not a payment instruction, bank-transfer request, supplier communication, tax determination, tax filing, or confirmation that goods or services were accepted outside the retained internal receipt record.

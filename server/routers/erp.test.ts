@@ -208,6 +208,13 @@ describe("operational ERP router", () => {
     expect(service.createInvoiceRecord).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, invoiceType: "receivable_invoice", counterpartyMasterId: 12, createdByUserId: 7 }));
     expect(service.createInternalPaymentRecord).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, invoiceRecordId: 62, createdByUserId: 7 }));
   });
+  it("forwards a supplier invoice reference only through the tenant-scoped payable invoice contract", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.createInvoiceRecord).mockResolvedValue({ id: 74, recordType: "payable_invoice", status: "draft" } as never);
+    await expect(caller().invoice.create({ ventureId: 21, invoiceType: "payable_invoice", recordNumber: "AP-REF-001", title: "Controlled payable reference", counterpartyMasterId: 15, amount: 100, effectiveDate: "2026-08-25", supplierInvoiceReference: "SUP-REF-001", data: {} })).resolves.toMatchObject({ id: 74 });
+    expect(service.createInvoiceRecord).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, invoiceType: "payable_invoice", counterpartyMasterId: 15, supplierInvoiceReference: "SUP-REF-001", createdByUserId: 7 }));
+  });
   it("forwards internal payable three-way-match evidence only through a finance-authorized tenant route", async () => {
     vi.mocked(requireVentureRole).mockReset();
     vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });

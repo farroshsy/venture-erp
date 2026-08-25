@@ -199,12 +199,21 @@ type PayableThreeWayMatch = {
   noExternalSupplierAction: true;
 };
 
-export async function createInvoiceRecord(input: { ventureId: number; invoiceType: InvoiceType; recordNumber: string; title: string; counterpartyMasterId: number; accountingPeriodId?: number; taxPolicyId?: number; amount: number; effectiveDate: string; dueDate?: string; data: Record<string, unknown>; createdByUserId: number }) {
+export async function createInvoiceRecord(input: { ventureId: number; invoiceType: InvoiceType; recordNumber: string; title: string; counterpartyMasterId: number; accountingPeriodId?: number; taxPolicyId?: number; amount: number; effectiveDate: string; dueDate?: string; supplierInvoiceReference?: string; data: Record<string, unknown>; createdByUserId: number }) {
   const db = await requireDb();
   const counterparty = await requireMaster(db, input.ventureId, input.counterpartyMasterId);
   const expectedDomain = input.invoiceType === "receivable_invoice" ? "customer" : "supplier";
   if (counterparty.domain !== expectedDomain) throw new Error(`${input.invoiceType === "receivable_invoice" ? "Receivable" : "Payable"} invoices require an active ${expectedDomain} master record.`);
-  return createOperationalRecord({ ventureId: input.ventureId, domain: input.invoiceType === "receivable_invoice" ? "sales" : "procurement", recordType: input.invoiceType, recordNumber: input.recordNumber, title: input.title, counterpartyMasterId: input.counterpartyMasterId, accountingPeriodId: input.accountingPeriodId, taxPolicyId: input.taxPolicyId, amount: input.amount, effectiveDate: input.effectiveDate, dueDate: input.dueDate, data: { ...input.data, invoiceType: input.invoiceType, noExternalCollectionOrDisbursement: true }, createdByUserId: input.createdByUserId });
+  const supplierInvoiceReference = input.invoiceType === "payable_invoice" && input.supplierInvoiceReference?.trim() ? input.supplierInvoiceReference.trim() : undefined;
+  const supplierInvoiceReferenceNormalized = supplierInvoiceReference?.toUpperCase();
+  if (supplierInvoiceReferenceNormalized) {
+    const payableInvoices = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.ventureId, input.ventureId), eq(erpOperationalRecords.recordType, "payable_invoice")));
+    const duplicate = payableInvoices.find(record => record.counterpartyMasterId === input.counterpartyMasterId && (record.data as { supplierInvoiceReferenceNormalized?: unknown }).supplierInvoiceReferenceNormalized === supplierInvoiceReferenceNormalized);
+    if (duplicate) throw new Error("A payable invoice with this supplier invoice reference already exists for the active supplier in this venture.");
+  }
+  const invoice = await createOperationalRecord({ ventureId: input.ventureId, domain: input.invoiceType === "receivable_invoice" ? "sales" : "procurement", recordType: input.invoiceType, recordNumber: input.recordNumber, title: input.title, counterpartyMasterId: input.counterpartyMasterId, accountingPeriodId: input.accountingPeriodId, taxPolicyId: input.taxPolicyId, amount: input.amount, effectiveDate: input.effectiveDate, dueDate: input.dueDate, data: { ...input.data, invoiceType: input.invoiceType, ...(supplierInvoiceReference ? { supplierInvoiceReference, supplierInvoiceReferenceNormalized } : {}), noExternalCollectionOrDisbursement: true }, createdByUserId: input.createdByUserId });
+  if (supplierInvoiceReferenceNormalized) await createAuditEvent({ ventureId: input.ventureId, domain: "finance", operationalRecordId: invoice.id, eventType: "payable_invoice.supplier_reference_recorded", actorUserId: input.createdByUserId, payload: { supplierMasterId: input.counterpartyMasterId, supplierInvoiceReference, supplierInvoiceReferenceNormalized, noExternalSupplierAction: true, noPaymentExecution: true } });
+  return invoice;
 }
 
 export async function evaluatePayableInvoiceThreeWayMatch(input: { ventureId: number; payableInvoiceRecordId: number; purchaseOrderRecordId: number; actorUserId: number }) {
