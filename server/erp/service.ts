@@ -177,6 +177,20 @@ export async function setVentureReportingCurrency(input: { ventureId: number; re
 }
 
 export type InvoiceType = "receivable_invoice" | "payable_invoice";
+export type InvoiceAgingBucket = "not_due" | "1_30" | "31_60" | "61_90" | "over_90" | "undated";
+
+export function classifyInvoiceAge(dueDate: string | undefined, asOfDate: string): { bucket: InvoiceAgingBucket; daysPastDue: number | null } {
+  if (!dueDate) return { bucket: "undated", daysPastDue: null };
+  const asOf = new Date(`${asOfDate}T00:00:00.000Z`);
+  const due = new Date(`${dueDate}T00:00:00.000Z`);
+  if (Number.isNaN(asOf.getTime()) || Number.isNaN(due.getTime())) throw new Error("Aging requires ISO calendar dates.");
+  const daysPastDue = Math.floor((asOf.getTime() - due.getTime()) / 86_400_000);
+  if (daysPastDue <= 0) return { bucket: "not_due", daysPastDue: 0 };
+  if (daysPastDue <= 30) return { bucket: "1_30", daysPastDue };
+  if (daysPastDue <= 60) return { bucket: "31_60", daysPastDue };
+  if (daysPastDue <= 90) return { bucket: "61_90", daysPastDue };
+  return { bucket: "over_90", daysPastDue };
+}
 
 type PayableThreeWayMatch = {
   status: "matched" | "mismatch";
@@ -301,6 +315,20 @@ export async function listInvoiceSettlements(ventureId: number) {
     const settledAmount = postedPayments.filter(payment => Number((payment.data as { invoiceRecordId?: unknown }).invoiceRecordId) === invoice.id).reduce((total, payment) => total + Number(payment.totalAmount), 0);
     return { invoice, settledAmount: normalizeMoney(settledAmount), openAmount: normalizeMoney(Math.max(0, Number(invoice.totalAmount) - settledAmount)) };
   });
+}
+
+export async function listInvoiceAging(ventureId: number, asOfDate: string) {
+  const settlements = await listInvoiceSettlements(ventureId);
+  const buckets: InvoiceAgingBucket[] = ["not_due", "1_30", "31_60", "61_90", "over_90", "undated"];
+  const emptyTotals = () => Object.fromEntries(buckets.map(bucket => [bucket, 0])) as Record<InvoiceAgingBucket, number>;
+  const summary: Record<InvoiceType, Record<InvoiceAgingBucket, number>> = { receivable_invoice: emptyTotals(), payable_invoice: emptyTotals() };
+  const invoices = settlements.filter(item => item.openAmount > 0).map(item => {
+    const age = classifyInvoiceAge(item.invoice.dueDate ?? undefined, asOfDate);
+    const invoiceType = item.invoice.recordType as InvoiceType;
+    summary[invoiceType][age.bucket] = normalizeMoney(summary[invoiceType][age.bucket] + item.openAmount);
+    return { invoiceId: item.invoice.id, recordNumber: item.invoice.recordNumber, title: item.invoice.title, invoiceType, dueDate: item.invoice.dueDate ?? null, openAmount: item.openAmount, currency: item.invoice.transactionCurrency, ...age };
+  });
+  return { asOfDate, invoices, summary };
 }
 
 export async function listOperationalRecords(input: { ventureId: number; domain?: OperationalDomain }) {

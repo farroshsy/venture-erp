@@ -31,6 +31,7 @@ vi.mock("../erp/service", () => ({
   reserveSalesOrderInventory: vi.fn(),
   fulfillSalesOrderInventory: vi.fn(),
   listInvoiceSettlements: vi.fn(),
+  listInvoiceAging: vi.fn(),
   createInvoiceRecord: vi.fn(),
   evaluatePayableInvoiceThreeWayMatch: vi.fn(),
   approveMatchedPayableInvoice: vi.fn(),
@@ -207,6 +208,12 @@ describe("operational ERP router", () => {
     await expect(caller().invoice.createPaymentRecord({ ventureId: 21, recordNumber: "PAY-001", title: "Internal payment evidence", invoiceRecordId: 62, amount: 100, effectiveDate: "2026-08-24", data: {} })).resolves.toMatchObject({ id: 63 });
     expect(service.createInvoiceRecord).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, invoiceType: "receivable_invoice", counterpartyMasterId: 12, createdByUserId: 7 }));
     expect(service.createInternalPaymentRecord).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, invoiceRecordId: 62, createdByUserId: 7 }));
+  });
+  it("returns internal invoice aging only after membership validation and forwards the as-of date", async () => {
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "operator", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.listInvoiceAging).mockResolvedValue({ asOfDate: "2026-08-25", invoices: [], summary: {} } as never);
+    await expect(caller().invoice.aging({ ventureId: 21, asOfDate: "2026-08-25" })).resolves.toMatchObject({ asOfDate: "2026-08-25" });
+    expect(service.listInvoiceAging).toHaveBeenCalledWith(21, "2026-08-25");
   });
   it("forwards a supplier invoice reference only through the tenant-scoped payable invoice contract", async () => {
     vi.mocked(requireVentureRole).mockReset();

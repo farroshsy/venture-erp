@@ -130,6 +130,14 @@ describe("typed-route sales lifecycle with real authorization", () => {
     expect(audits.some(event => event.operationalRecordId === invoice!.id && event.eventType === "payable_invoice.supplier_reference_recorded")).toBe(true);
   }, 20_000);
 
+  it("returns aging from retained internal invoice evidence without creating a collection, disbursement, or external action", async () => {
+    const admin = callerFor(1, "owner");
+    const aging = await admin.invoice.aging({ ventureId, asOfDate: "2026-08-25" });
+    expect(aging.asOfDate).toBe("2026-08-25");
+    expect(aging.invoices.some(item => item.recordNumber === "VALIDATION-E2E-SUPPLIER-REFERENCE-AP-20260825" && item.bucket === "undated")).toBe(true);
+    expect(aging.summary.payable_invoice.undated).toBeGreaterThanOrEqual(25);
+  }, 20_000);
+
   it("persists explicit jurisdiction-neutral people, delivery, asset, service, and CRM work controls with approval evidence", async () => {
     const operator = callerFor(operatorUserId, operatorOpenId);
     const workControls = [

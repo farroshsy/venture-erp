@@ -117,3 +117,4 @@
 - [x] Implement an internal, tenant-scoped payable-invoice three-way-match evidence control that compares an approved purchase order, recorded receipt evidence, and a supplier payable invoice; blocks mismatches from payable approval; records audit evidence; and performs no payment, supplier messaging, tax filing, or external action.
 - [x] Add a finance-authorized Cash Control action that can approve only a successfully matched payable invoice, keeps mismatch approvals refused, and records no payment or external effect.
 - [x] Add tenant-scoped supplier-invoice-reference capture and duplicate prevention for payable invoices, with audit evidence and no external payment or supplier action.
+- [x] Add a tenant-scoped internal receivable/payable aging view based on retained open invoice evidence, with no collections, disbursements, credit decision, or external effect.

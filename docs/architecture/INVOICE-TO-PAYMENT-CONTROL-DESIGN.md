@@ -24,6 +24,8 @@ The Cash Control workspace also exposes a dedicated `approveMatchedPayable` acti
 
 For payable intake, the workspace requires a supplier invoice reference. The server normalizes that reference for comparison and rejects a second payable invoice in the same venture for the same supplier with the same normalized reference. It persists both the entered and normalized reference on the retained internal record and emits `payable_invoice.supplier_reference_recorded`. The constraint deliberately has no cross-venture effect and does not send a supplier message, inspect a supplier portal, execute a payment, or make a tax or compliance determination.
 
+The invoice register also provides an internal aging view. As of a supplied calendar date, it aggregates only invoices with a retained positive internal open balance into `not_due`, `1_30`, `31_60`, `61_90`, `over_90`, and `undated` buckets, separately for receivables and payables. This is a read-only exposure view based on retained due-date and settlement evidence. It is not a collection workflow, credit decision, disbursement decision, credit-loss determination, or external action.
+
 > A posted internal payment record is **evidence of a controlled accounting event**, not proof that a bank, processor, or government authority accepted or executed a transaction.
 
 > A matched payable invoice is **approval eligibility evidence only**. It is not a payment instruction, bank-transfer request, supplier communication, tax determination, tax filing, or confirmation that goods or services were accepted outside the retained internal receipt record.
