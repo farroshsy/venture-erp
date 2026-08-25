@@ -131,3 +131,5 @@
 - [x] Bind configured finance dimensions into immutable per-line journal-proposal snapshots with source, rule, period, currency, and evidence context, without creating journals or external effects.
 - [x] Implement bounded deterministic multi-line percentage allocation rules with fixed two-decimal residual handling and explainable proposal-only evidence; defer fixed, quantity, driver, and valuation allocations until separately governed.
 - [x] Design a read-only ledger-simulation layer for explainable accounting previews that cannot create journals, assign numbers, mutate balances, trigger integrations, or affect payroll compliance.
+- [x] Implement deterministic tenant-scoped read-only ledger simulation over immutable accounting events and approved rules, with metadata-only audit evidence and no journal, balance, payroll, tax, payment, workflow, integration, or external effect.
+- [x] Add a read-only simulation interface showing source/rule/dimension/allocation derivations, balancing, warnings, and an explicit no-accounting-impact boundary.

@@ -27,6 +27,7 @@ vi.mock("../erp/service", () => ({
   createPostingRuleRevision: vi.fn(),
   approvePostingRuleRevision: vi.fn(),
   evaluateAccountingEventToProposal: vi.fn(),
+  simulateAccountingEvent: vi.fn(),
   reviewJournalProposal: vi.fn(),
   listFinanceDimensions: vi.fn(),
   createFinanceDimensionDefinition: vi.fn(),

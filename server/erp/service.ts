@@ -579,6 +579,37 @@ export async function evaluateAccountingEventToProposal(input: { ventureId: numb
   return { id, proposalNumber, status: "pending_review" as const, lines };
 }
 
+export async function simulateAccountingEvent(input: { ventureId: number; accountingEventId: number; postingRuleRevisionId?: number; actorUserId: number; rationale: string }) {
+  const db = await requireDb();
+  const [event] = await db.select().from(erpAccountingEvents).where(and(eq(erpAccountingEvents.id, input.accountingEventId), eq(erpAccountingEvents.ventureId, input.ventureId))).limit(1);
+  if (!event) throw new Error("Accounting event not found in the active venture.");
+  const rules = (await db.select().from(erpPostingRuleRevisions).where(and(eq(erpPostingRuleRevisions.ventureId, input.ventureId), eq(erpPostingRuleRevisions.eventType, event.eventType), eq(erpPostingRuleRevisions.status, "approved")))).filter(rule => rule.effectiveFrom <= event.accountingDate && (rule.effectiveTo === null || rule.effectiveTo >= event.accountingDate) && (!input.postingRuleRevisionId || rule.id === input.postingRuleRevisionId));
+  const activeDimensions = await db.select().from(erpFinanceDimensionDefinitions).where(and(eq(erpFinanceDimensionDefinitions.ventureId, input.ventureId), eq(erpFinanceDimensionDefinitions.status, "active")));
+  const sourceDimensions = event.dimensionsSnapshot as Record<string, unknown>;
+  const frozenDimensions = activeDimensions.map(definition => ({ definitionId: definition.id, code: definition.code, name: definition.name, requiredForProposal: definition.requiredForProposal, sourceValue: sourceDimensions[definition.code] ?? null }));
+  const refusalReasons = [
+    ...(rules.length === 0 ? ["No matching approved effective-dated rule revision is available."] : rules.length > 1 ? ["More than one matching approved rule revision is available."] : []),
+    ...frozenDimensions.filter(dimension => dimension.requiredForProposal && (dimension.sourceValue === null || dimension.sourceValue === undefined)).map(dimension => `Required finance dimension ${dimension.code} has no retained source value.`),
+  ];
+  const rule = rules.length === 1 ? rules[0] : null;
+  const simulationId = `SIM-${event.id}-${rule?.id ?? "REFUSED"}-${event.eventKey}`;
+  let lines: Array<Record<string, unknown>> = [];
+  if (rule && refusalReasons.length === 0) {
+    const configuredLines = asPostingRuleLines(rule.lineConfiguration);
+    const totalCents = Math.round(Number(event.functionalAmount) * 100);
+    let allocatedDebitCents = 0;
+    const debitLines = configuredLines.filter(line => line.entrySide === "debit");
+    const frozenContext = { tenant: input.ventureId, accountingEventId: event.id, sourceDocument: event.sourceSnapshot, sourceEvidence: event.evidenceSnapshot, sourceDimensions: event.dimensionsSnapshot, postingRuleRevisionId: rule.id, ruleCode: rule.ruleCode, ruleRevision: rule.revision, effectiveDate: event.accountingDate, accountingPeriodId: event.accountingPeriodId, currency: event.functionalCurrency, financeDimensions: frozenDimensions };
+    lines = configuredLines.map(line => { const isFinalDebit = line.entrySide === "debit" && line === debitLines[debitLines.length - 1]; const amountCents = line.entrySide === "credit" ? totalCents : isFinalDebit ? totalCents - allocatedDebitCents : Math.floor(totalCents * (line.allocationBasisPoints ?? 0) / 10_000); if (line.entrySide === "debit") allocatedDebitCents += amountCents; return { ...line, currency: event.functionalCurrency, amount: normalizeMoney(amountCents / 100), derivation: { method: "percentage_allocation", allocationBasisPoints: line.allocationBasisPoints, totalCents, residualApplied: isFinalDebit ? totalCents - allocatedDebitCents + amountCents : 0 }, frozenDimensions: frozenContext }; });
+  }
+  const debitTotal = lines.filter(line => line.entrySide === "debit").reduce((sum, line) => sum + Number(line.amount), 0);
+  const creditTotal = lines.filter(line => line.entrySide === "credit").reduce((sum, line) => sum + Number(line.amount), 0);
+  const isBalanced = lines.length > 0 && normalizeMoney(debitTotal) === normalizeMoney(creditTotal);
+  if (lines.length > 0 && !isBalanced) refusalReasons.push("Simulation output is not balanced.");
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: refusalReasons.length ? "ledger_simulation.refused" : "ledger_simulation.executed", actorUserId: input.actorUserId, payload: { simulationId, accountingEventId: event.id, postingRuleRevisionId: rule?.id ?? null, rationale: input.rationale, lineCount: lines.length, status: refusalReasons.length ? "refused" : "completed", metadataOnly: true, noJournalCreated: true, noJournalNumberAssigned: true, noBalanceMutation: true, noWorkflowTriggered: true, noExternalEffect: true } });
+  return { simulationId, simulationVersion: 1, simulationTimestamp: event.createdAt, accountingEventId: event.id, postingRuleRevisionId: rule?.id ?? null, lines, balancing: { debitTotal: normalizeMoney(debitTotal), creditTotal: normalizeMoney(creditTotal), isBalanced }, frozenDimensions, refusalReasons, boundary: { simulationOnly: true, journalCreated: false, journalNumberAssigned: false, balanceMutated: false, workflowTriggered: false, integrationTriggered: false, externalEffect: false } };
+}
+
 export async function reviewJournalProposal(input: { ventureId: number; journalProposalId: number; decision: "approved" | "rejected"; note: string; actorUserId: number }) {
   const db = await requireDb();
   const [proposal] = await db.select().from(erpJournalProposals).where(and(eq(erpJournalProposals.id, input.journalProposalId), eq(erpJournalProposals.ventureId, input.ventureId))).limit(1);

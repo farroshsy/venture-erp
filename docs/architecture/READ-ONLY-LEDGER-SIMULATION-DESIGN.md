@@ -74,3 +74,9 @@ If audit retention is later required, the platform may store an immutable **simu
 ## Non-goals
 
 This design does not model FIFO, LIFO, weighted average, manufacturing cost pools, tax, statutory payroll, cash forecasting, a general-ledger posting engine, or an accounting opinion. Any production accounting conclusion remains subject to the venture's finance governance and qualified professional review.
+
+## First implementation status
+
+The first bounded implementation is available through the finance-authorized `accountingControl.simulateEvent` contract and the Journal Control **Simulate only** action. It reads a single immutable accounting event and one matching approved effective-dated rule revision, freezes the active dimension catalog and event context, executes the same deterministic percentage-allocation preview logic in memory, and returns explainable debit/credit lines, derivations, balancing, and refusal reasons.
+
+It writes only `ledger_simulation.executed` or `ledger_simulation.refused` metadata audit evidence. The audit contains request identity, source/rule identifiers, result status, and non-mutation flags; it does not persist simulated lines, journal entries, balances, or a simulation ledger. The returned report is visibly labelled **Simulation only — no accounting impact** and contains no journal-creation, numbering, posting, balance, inventory, payment, payroll/tax, filing, workflow, integration, or external-effect path.
