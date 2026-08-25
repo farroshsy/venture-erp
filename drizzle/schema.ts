@@ -395,8 +395,30 @@ export const erpAccountingEvents = mysqlTable("erp_accounting_events", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, table => [
   uniqueIndex("erp_accounting_event_venture_key_unique").on(table.ventureId, table.eventKey),
-  uniqueIndex("erp_accounting_event_receipt_unique").on(table.ventureId, table.sourceInventoryMovementId, table.eventType),
   index("erp_accounting_event_venture_type_date_idx").on(table.ventureId, table.eventType, table.accountingDate),
+]);
+
+export const erpAccountingCalculationEvidence = mysqlTable("erp_accounting_calculation_evidence", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  calculationKey: varchar("calculationKey", { length: 140 }).notNull(),
+  accountingEventId: int("accountingEventId").notNull().references(() => erpAccountingEvents.id),
+  postingRuleRevisionId: int("postingRuleRevisionId").references(() => erpPostingRuleRevisions.id),
+  engineVersion: varchar("engineVersion", { length: 32 }).notNull(),
+  status: mysqlEnum("status", ["completed", "refused"]).notNull(),
+  inputHash: varchar("inputHash", { length: 64 }).notNull(),
+  outputHash: varchar("outputHash", { length: 64 }).notNull(),
+  previousRecordHash: varchar("previousRecordHash", { length: 64 }),
+  recordHash: varchar("recordHash", { length: 64 }).notNull(),
+  inputSnapshot: json("inputSnapshot").notNull(),
+  calculationSnapshot: json("calculationSnapshot").notNull(),
+  invariantSnapshot: json("invariantSnapshot").notNull(),
+  reviewStatus: mysqlEnum("reviewStatus", ["pending_review", "reviewed", "rejected"]).notNull().default("pending_review"),
+  calculatedByUserId: int("calculatedByUserId").notNull().references(() => users.id),
+  calculatedAt: timestamp("calculatedAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("erp_calc_evidence_venture_key_unique").on(table.ventureId, table.calculationKey),
+  index("erp_calc_evidence_venture_event_idx").on(table.ventureId, table.accountingEventId, table.calculatedAt),
 ]);
 
 export const erpPostingRuleRevisions = mysqlTable("erp_posting_rule_revisions", {

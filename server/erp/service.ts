@@ -1,5 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
+import { createHash } from "node:crypto";
 import {
+  erpAccountingCalculationEvidence,
   erpAccountingEvents,
   erpAccountingPeriods,
   erpAuditEvents,
@@ -608,6 +610,75 @@ export async function simulateAccountingEvent(input: { ventureId: number; accoun
   if (lines.length > 0 && !isBalanced) refusalReasons.push("Simulation output is not balanced.");
   await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: refusalReasons.length ? "ledger_simulation.refused" : "ledger_simulation.executed", actorUserId: input.actorUserId, payload: { simulationId, accountingEventId: event.id, postingRuleRevisionId: rule?.id ?? null, rationale: input.rationale, lineCount: lines.length, status: refusalReasons.length ? "refused" : "completed", metadataOnly: true, noJournalCreated: true, noJournalNumberAssigned: true, noBalanceMutation: true, noWorkflowTriggered: true, noExternalEffect: true } });
   return { simulationId, simulationVersion: 1, simulationTimestamp: event.createdAt, accountingEventId: event.id, postingRuleRevisionId: rule?.id ?? null, lines, balancing: { debitTotal: normalizeMoney(debitTotal), creditTotal: normalizeMoney(creditTotal), isBalanced }, frozenDimensions, refusalReasons, boundary: { simulationOnly: true, journalCreated: false, journalNumberAssigned: false, balanceMutated: false, workflowTriggered: false, integrationTriggered: false, externalEffect: false } };
+}
+
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, child]) => [key, canonicalize(child)]));
+  return value;
+}
+const canonicalHash = (value: unknown) => createHash("sha256").update(JSON.stringify(canonicalize(value))).digest("hex");
+
+function independentlyValidateCalculation(lines: Array<Record<string, unknown>>, balancing: { debitTotal: number; creditTotal: number; isBalanced: boolean }) {
+  const debitLines = lines.filter(line => line.entrySide === "debit");
+  const creditLines = lines.filter(line => line.entrySide === "credit");
+  const debitBasisPoints = debitLines.reduce((sum, line) => sum + Number((line.derivation as Record<string, unknown> | undefined)?.allocationBasisPoints ?? 0), 0);
+  const creditBasisPoints = creditLines.reduce((sum, line) => sum + Number((line.derivation as Record<string, unknown> | undefined)?.allocationBasisPoints ?? 0), 0);
+  const debitCents = debitLines.reduce((sum, line) => sum + Math.round(Number(line.amount) * 100), 0);
+  const creditCents = creditLines.reduce((sum, line) => sum + Math.round(Number(line.amount) * 100), 0);
+  const sourceTotalCents = Number((lines[0]?.derivation as Record<string, unknown> | undefined)?.totalCents ?? 0);
+  const finalDebit = debitLines[debitLines.length - 1];
+  const residualApplied = Number((finalDebit?.derivation as Record<string, unknown> | undefined)?.residualApplied ?? 0);
+  return {
+    debitEqualsCredit: balancing.isBalanced && debitCents === creditCents && normalizeMoney(balancing.debitTotal) === normalizeMoney(balancing.creditTotal),
+    debitAllocationTotals10k: debitLines.length > 0 && debitBasisPoints === 10_000,
+    creditAllocationTotals10k: creditLines.length === 1 && creditBasisPoints === 10_000,
+    allocatedDebitCentsEqualsSource: debitLines.length > 0 && debitCents === sourceTotalCents,
+    deterministicResidualExplained: debitLines.length > 0 && Number.isInteger(residualApplied) && residualApplied >= 0,
+    sourceTotalCents,
+    debitCents,
+    creditCents,
+    residualApplied,
+    noPostingPath: true,
+    noExternalEffect: true,
+  };
+}
+
+export async function createAccountingCalculationEvidence(input: { ventureId: number; accountingEventId: number; postingRuleRevisionId?: number; actorUserId: number; rationale: string }) {
+  const simulation = await simulateAccountingEvent(input); const db = await requireDb(); const calculationKey = `CALC-${simulation.simulationId}`;
+  const [existing] = await db.select().from(erpAccountingCalculationEvidence).where(and(eq(erpAccountingCalculationEvidence.ventureId, input.ventureId), eq(erpAccountingCalculationEvidence.calculationKey, calculationKey))).limit(1); if (existing) return existing;
+  const inputSnapshot = { accountingEventId: simulation.accountingEventId, postingRuleRevisionId: simulation.postingRuleRevisionId, frozenDimensions: simulation.frozenDimensions, rationale: input.rationale };
+  const calculationSnapshot = { lines: simulation.lines, balancing: simulation.balancing, refusalReasons: simulation.refusalReasons };
+  const invariantSnapshot = independentlyValidateCalculation(simulation.lines, simulation.balancing);
+  const [previous] = await db.select().from(erpAccountingCalculationEvidence).where(eq(erpAccountingCalculationEvidence.ventureId, input.ventureId)).orderBy(desc(erpAccountingCalculationEvidence.id)).limit(1); const inputHash = canonicalHash(inputSnapshot); const outputHash = canonicalHash(calculationSnapshot); const previousRecordHash = previous?.recordHash ?? null; const recordHash = canonicalHash({ calculationKey, inputHash, outputHash, previousRecordHash, engineVersion: "1.0.0" });
+  const result = await db.insert(erpAccountingCalculationEvidence).values({ ventureId: input.ventureId, calculationKey, accountingEventId: simulation.accountingEventId, postingRuleRevisionId: simulation.postingRuleRevisionId, engineVersion: "1.0.0", status: simulation.refusalReasons.length ? "refused" : "completed", inputHash, outputHash, previousRecordHash, recordHash, inputSnapshot, calculationSnapshot, invariantSnapshot, calculatedByUserId: input.actorUserId });
+  const id = Number(result[0].insertId);
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: "ledger_calculation_evidence.created", actorUserId: input.actorUserId, payload: { calculationEvidenceId: id, accountingEventId: simulation.accountingEventId, postingRuleRevisionId: simulation.postingRuleRevisionId, calculationKey, status: simulation.refusalReasons.length ? "refused" : "completed", recordHash, previousRecordHash, noJournalCreated: true, noJournalNumberAssigned: true, noBalanceMutation: true, noTaxCalculation: true, noPayrollCalculation: true, noPaymentExecution: true, noFiling: true, noWorkflowTriggered: true, noIntegrationTriggered: true, noExternalEffect: true } });
+  return { id, calculationKey, recordHash, status: simulation.refusalReasons.length ? "refused" as const : "completed" as const, simulation };
+}
+
+export async function listAccountingCalculationEvidence(ventureId: number) {
+  const db = await requireDb();
+  return db.select().from(erpAccountingCalculationEvidence).where(eq(erpAccountingCalculationEvidence.ventureId, ventureId)).orderBy(desc(erpAccountingCalculationEvidence.id));
+}
+
+export async function verifyAccountingCalculationEvidenceChain(ventureId: number) {
+  const db = await requireDb();
+  const records = await db.select().from(erpAccountingCalculationEvidence).where(eq(erpAccountingCalculationEvidence.ventureId, ventureId)).orderBy(erpAccountingCalculationEvidence.id);
+  let expectedPreviousRecordHash: string | null = null;
+  const checks = records.map(record => {
+    const inputHashValid = canonicalHash(record.inputSnapshot) === record.inputHash;
+    const outputHashValid = canonicalHash(record.calculationSnapshot) === record.outputHash;
+    const expectedRecordHash = canonicalHash({ calculationKey: record.calculationKey, inputHash: record.inputHash, outputHash: record.outputHash, previousRecordHash: expectedPreviousRecordHash, engineVersion: record.engineVersion });
+    const chainLinkValid = record.previousRecordHash === expectedPreviousRecordHash;
+    const recordHashValid = expectedRecordHash === record.recordHash;
+    const snapshot = record.calculationSnapshot as { lines?: Array<Record<string, unknown>>; balancing?: { debitTotal: number; creditTotal: number; isBalanced: boolean } };
+    const invariantSnapshot = independentlyValidateCalculation(snapshot.lines ?? [], snapshot.balancing ?? { debitTotal: 0, creditTotal: 0, isBalanced: false });
+    const independentInvariantValid = canonicalHash(invariantSnapshot) === canonicalHash(record.invariantSnapshot);
+    expectedPreviousRecordHash = record.recordHash;
+    return { id: record.id, calculationKey: record.calculationKey, inputHashValid, outputHashValid, chainLinkValid, recordHashValid, independentInvariantValid, valid: inputHashValid && outputHashValid && chainLinkValid && recordHashValid && independentInvariantValid };
+  });
+  return { ventureId, recordCount: records.length, valid: checks.every(check => check.valid), checks, noJournalCreated: true as const, noAutomaticPosting: true as const, noExternalEffect: true as const };
 }
 
 export async function reviewJournalProposal(input: { ventureId: number; journalProposalId: number; decision: "approved" | "rejected"; note: string; actorUserId: number }) {

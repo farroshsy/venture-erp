@@ -30,6 +30,14 @@ This is intentionally not a valuation, landed-cost, weight, volume, driver, cost
 
 The companion `READ-ONLY-LEDGER-SIMULATION-DESIGN.md` defines the next safe preview layer. It consumes only immutable accounting-event, rule, proposal, and dimension snapshots; returns an explainable ephemeral result; and refuses incomplete, cross-tenant, unapproved, mixed-currency, or unbalanced inputs. It is intentionally separate from journal creation and posting.
 
+## 0.5 Immutable calculation evidence and tamper-evident verification
+
+Migration `0019_handy_bromley.sql` adds `erp_accounting_calculation_evidence`, an append-only, tenant-scoped calculation record for the bounded procurement-receipt calculation. A finance-authorized user may explicitly request evidence separately from **Simulate only**. The service freezes calculation inputs and outputs, recursively canonicalizes object keys, and calculates SHA-256 `inputHash`, `outputHash`, and `recordHash`; the latter includes the preceding evidence record hash, calculation key, engine version, and status. The first record has a `null` predecessor, while each later record retains the immediately preceding venture record hash.
+
+The stored invariant snapshot is independently derived from the generated lines rather than copied from the simulation balancing flag. It checks debit-versus-credit cents, debit and credit allocation totals of 10,000 basis points, debit cents against retained source cents, and the presence of a deterministic final-debit residual explanation. Read-only verification rehashes stored snapshots, replays record-hash predecessor links in ID order, recomputes the independent invariants, and returns a per-record pass/fail posture. It does not update evidence or calculate any statutory, payroll, tax, payment, inventory-valuation, filing, workflow, integration, or external result.
+
+The Journal Control interface makes the distinction visible: **Simulate only** remains a metadata-audited in-memory preview; **Calculate immutable evidence** retains one tenant-scoped evidence record keyed to the deterministic simulation; the evidence register exposes retained record hashes, predecessor hashes, review status, and a read-only chain-verification posture. Neither action creates, converts, posts, or numbers a journal.
+
 ## 1. Purpose and boundary
 
 This design adds a controlled seam between an operational fact and a finance-reviewed journal. A source module emits an **immutable internal accounting event**. A finance-owned, effective-dated posting-rule revision may evaluate that event into a **balanced journal proposal**. The proposal is separate from the authoritative journal and cannot post itself. Existing finance authorization, period controls, balanced-journal validation, and audit evidence remain the only path to a posted journal.

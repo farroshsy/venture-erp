@@ -1,5 +1,10 @@
 # Validation Notes
 
+### Immutable calculation-evidence validation
+Migration `0019_handy_bromley.sql` is physically applied and adds tenant-scoped append-only calculation evidence. Journal Control now separates the existing read-only simulation from an explicit finance-authorized **Calculate immutable evidence** action. Fresh desktop and 375-pixel mobile captures show the action, retained calculation register, hash-chain posture, completed and refused evidence entries, and predecessor/record hashes without horizontal clipping. The visible control states that it cannot create a journal, journal number, ledger balance, payment, tax result, payroll result, filing, workflow, integration, or external effect.
+
+The real typed-route procurement-receipt lifecycle now persists a completed calculation record and a deliberately unavailable-rule refusal record, verifies canonical 64-character input/output/record hashes and the predecessor chain, independently recomputes debit/credit, allocation, cents, and residual invariants, confirms an unchanged journal count, and confirms metadata-only audit evidence. The lifecycle also proves that deliberately altered expected input does not match the retained input hash. The full unit suite passed with 78 tests; the dedicated integration suite passed with 19 tests; contract validation, foundation verification, and the production build passed. The Indonesian payroll pack remains draft-only and blocked pending qualified reviewer evidence.
+
 ## 2026-08-23 — Workspace preview
 
 The authenticated ERP workspace successfully resolved the connected account and rendered the portfolio dashboard. The initial unstyled preview was traced to missing Tailwind utility generation in the global stylesheet; `@import "tailwindcss"` was restored before final visual verification. The workspace begins with no venture records by design and exposes a venture-creation control that establishes the tenant boundary before operational workflows begin.

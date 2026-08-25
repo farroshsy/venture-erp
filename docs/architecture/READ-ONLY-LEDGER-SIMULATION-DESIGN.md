@@ -1,6 +1,6 @@
 # Read-Only Ledger Simulation Design
 
-> **Status:** Architecture design only. A simulation is an explainable preview over retained internal accounting evidence. It cannot create a journal, assign a journal number, alter balances, update inventory valuation, initiate payment, calculate tax or payroll, file, transmit externally, or modify source records.
+> **Status:** The bounded single-event simulation is implemented as an explainable preview over retained internal accounting evidence. It cannot create a journal, assign a journal number, alter balances, update inventory valuation, initiate payment, calculate tax or payroll, file, transmit externally, or modify source records.
 
 ## Purpose
 
@@ -60,7 +60,7 @@ The user interface should show the retained source event or proposal first, then
 
 > **Preview only. This simulation does not create a journal, update a ledger, affect inventory value, initiate a payment, calculate tax or payroll, or send information outside Venture ERP.**
 
-If audit retention is later required, the platform may store an immutable **simulation request/evidence record** that contains the request hash and output hash, but never a posting effect. That storage must be separately approved; initial delivery should remain ephemeral.
+Simulation remains ephemeral apart from its existing metadata-only audit event. A separately authorized **Calculate immutable evidence** operation may retain an append-only calculation record with canonical input/output hashes, an independent invariant snapshot, and a predecessor record hash. This explicit operation is distinct from **Simulate only**: it never creates a proposal, journal, journal number, ledger balance, payment, tax/payroll result, filing, workflow, integration, or external effect. Read-only chain verification rehashes retained evidence and checks predecessor continuity without mutating it.
 
 ## Phased adoption
 
@@ -80,3 +80,5 @@ This design does not model FIFO, LIFO, weighted average, manufacturing cost pool
 The first bounded implementation is available through the finance-authorized `accountingControl.simulateEvent` contract and the Journal Control **Simulate only** action. It reads a single immutable accounting event and one matching approved effective-dated rule revision, freezes the active dimension catalog and event context, executes the same deterministic percentage-allocation preview logic in memory, and returns explainable debit/credit lines, derivations, balancing, and refusal reasons.
 
 It writes only `ledger_simulation.executed` or `ledger_simulation.refused` metadata audit evidence. The audit contains request identity, source/rule identifiers, result status, and non-mutation flags; it does not persist simulated lines, journal entries, balances, or a simulation ledger. The returned report is visibly labelled **Simulation only — no accounting impact** and contains no journal-creation, numbering, posting, balance, inventory, payment, payroll/tax, filing, workflow, integration, or external-effect path.
+
+The finance-authorized `accountingControl.createCalculationEvidence` contract is the separately controlled retention path. It stores completed and refused procurement-receipt calculations, calculates canonical input/output/record hashes, links each record to the predecessor hash for the same venture, and stores independently recomputed double-entry, allocation-total, source-cent, and residual checks. `accountingControl.verifyCalculationEvidenceChain` is read-only and exposes a per-record validation posture to Journal Control. Neither contract can create, convert, post, or number a journal.

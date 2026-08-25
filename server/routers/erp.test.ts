@@ -28,6 +28,9 @@ vi.mock("../erp/service", () => ({
   approvePostingRuleRevision: vi.fn(),
   evaluateAccountingEventToProposal: vi.fn(),
   simulateAccountingEvent: vi.fn(),
+  createAccountingCalculationEvidence: vi.fn(),
+  listAccountingCalculationEvidence: vi.fn(),
+  verifyAccountingCalculationEvidenceChain: vi.fn(),
   reviewJournalProposal: vi.fn(),
   listFinanceDimensions: vi.fn(),
   createFinanceDimensionDefinition: vi.fn(),
@@ -178,12 +181,21 @@ describe("operational ERP router", () => {
     vi.mocked(service.listAccountingControl).mockResolvedValue({ events: [], rules: [], proposals: [] } as never);
     vi.mocked(service.createPostingRuleRevision).mockResolvedValue({ id: 91, revision: 1, status: "draft" } as never);
     vi.mocked(service.approvePostingRuleRevision).mockResolvedValue({ id: 91, status: "approved" } as never);
+    vi.mocked(service.createAccountingCalculationEvidence).mockResolvedValue({ id: 93, calculationKey: "CALC-SIM-1", recordHash: "a".repeat(64), status: "completed", simulation: {} } as never);
+    vi.mocked(service.listAccountingCalculationEvidence).mockResolvedValue([{ id: 93, calculationKey: "CALC-SIM-1", status: "completed" }] as never);
+    vi.mocked(service.verifyAccountingCalculationEvidenceChain).mockResolvedValue({ ventureId: 21, recordCount: 1, valid: true, checks: [], noJournalCreated: true, noAutomaticPosting: true, noExternalEffect: true } as never);
     vi.mocked(service.reviewJournalProposal).mockResolvedValue({ id: 92, status: "approved", noJournalCreated: true } as never);
     await expect(caller().accountingControl.overview({ ventureId: 21 })).resolves.toMatchObject({ events: [] });
     await expect(caller().accountingControl.createPostingRuleRevision({ ventureId: 21, ruleCode: "PROC_RECEIPT", ruleName: "Internal procurement receipt", eventType: "procurement_receipt", effectiveFrom: "2026-08-25", debitAccountMasterId: 10, creditAccountMasterId: 11, changeRationale: "Validation-only controlled mapping" })).resolves.toMatchObject({ id: 91, status: "draft" });
     await expect(caller().accountingControl.approvePostingRuleRevision({ ventureId: 21, postingRuleRevisionId: 91 })).resolves.toMatchObject({ status: "approved" });
+    await expect(caller().accountingControl.createCalculationEvidence({ ventureId: 21, accountingEventId: 90, rationale: "Immutable validation evidence only." })).resolves.toMatchObject({ calculationKey: "CALC-SIM-1", status: "completed" });
+    await expect(caller().accountingControl.calculationEvidence({ ventureId: 21 })).resolves.toMatchObject([{ calculationKey: "CALC-SIM-1" }]);
+    await expect(caller().accountingControl.verifyCalculationEvidenceChain({ ventureId: 21 })).resolves.toMatchObject({ valid: true, noJournalCreated: true, noExternalEffect: true });
     await expect(caller().accountingControl.reviewProposal({ ventureId: 21, journalProposalId: 92, decision: "approved", note: "Internal review only; no journal posting." })).resolves.toMatchObject({ noJournalCreated: true });
     expect(service.createPostingRuleRevision).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, eventType: "procurement_receipt", createdByUserId: 7 }));
+    expect(service.createAccountingCalculationEvidence).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, accountingEventId: 90, actorUserId: 7 }));
+    expect(service.listAccountingCalculationEvidence).toHaveBeenCalledWith(21);
+    expect(service.verifyAccountingCalculationEvidenceChain).toHaveBeenCalledWith(21);
     expect(service.reviewJournalProposal).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, journalProposalId: 92, decision: "approved", actorUserId: 7 }));
   });
   it("keeps configurable finance dimensions within the active venture and finance authorization", async () => {

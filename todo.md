@@ -133,3 +133,5 @@
 - [x] Design a read-only ledger-simulation layer for explainable accounting previews that cannot create journals, assign numbers, mutate balances, trigger integrations, or affect payroll compliance.
 - [x] Implement deterministic tenant-scoped read-only ledger simulation over immutable accounting events and approved rules, with metadata-only audit evidence and no journal, balance, payroll, tax, payment, workflow, integration, or external effect.
 - [x] Add a read-only simulation interface showing source/rule/dimension/allocation derivations, balancing, warnings, and an explicit no-accounting-impact boundary.
+- [x] Implement immutable procurement-receipt calculation evidence with canonical input/output hashes, predecessor hash chaining, metadata-only review state, and no posting or external effect.
+- [x] Add independent double-entry, allocation-total, and residual invariants plus a read-only calculation-evidence review surface; defer valuation, COGS, FX revaluation, investment, and payroll calculations.

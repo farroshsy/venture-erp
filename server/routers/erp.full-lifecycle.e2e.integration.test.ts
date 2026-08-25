@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import { erpOperationalRecords, users, ventureMemberships } from "../../drizzle/schema";
 import type { TrpcContext } from "../_core/context";
 import { getDb } from "../db";
@@ -154,10 +155,23 @@ describe("typed-route sales lifecycle with real authorization", () => {
     expect(["pending_review", "approved"]).toContain(proposal.status);
     expect(proposal.proposalSnapshot).toMatchObject({ accountingEventId: event.id, ruleCode: "VALIDATION-E2E-PROC-RECEIPT", noJournalCreated: true, noAutomaticPosting: true, noExternalEffect: true, lines: expect.arrayContaining([expect.objectContaining({ entrySide: "debit", amount: 125 }), expect.objectContaining({ entrySide: "credit", amount: 125 })]) });
     if (proposal.status === "pending_review") await admin.accountingControl.reviewProposal({ ventureId, journalProposalId: proposal.id, decision: "approved", note: "VALIDATION-ONLY finance review; retain as proposal only." });
+    const calculationEvidence = await admin.accountingControl.createCalculationEvidence({ ventureId, accountingEventId: event.id, postingRuleRevisionId: rule.id, rationale: "VALIDATION-E2E immutable procurement-receipt calculation evidence; no journal creation or posting." });
+    const refusedCalculationEvidence = await admin.accountingControl.createCalculationEvidence({ ventureId, accountingEventId: event.id, postingRuleRevisionId: rule.id + 99_999, rationale: "VALIDATION-E2E refused calculation evidence for an unavailable rule; no journal creation or posting." });
+    const retainedEvidence = await admin.accountingControl.calculationEvidence({ ventureId });
+    const chainVerification = await admin.accountingControl.verifyCalculationEvidenceChain({ ventureId });
+    expect(calculationEvidence).toMatchObject({ status: "completed" });
+    expect(refusedCalculationEvidence).toMatchObject({ status: "refused" });
+    expect(retainedEvidence.some(item => item.accountingEventId === event.id && item.recordHash.length === 64 && item.inputHash.length === 64 && item.outputHash.length === 64)).toBe(true);
+    const refusedRecord = retainedEvidence.find(item => item.status === "refused" && item.accountingEventId === event.id)!;
+    const alteredExpectedInputHash = createHash("sha256").update(JSON.stringify({ accountingEventId: refusedRecord.inputSnapshot.accountingEventId, frozenDimensions: refusedRecord.inputSnapshot.frozenDimensions, postingRuleRevisionId: refusedRecord.inputSnapshot.postingRuleRevisionId, rationale: "DELIBERATELY ALTERED INPUT" })).digest("hex");
+    expect(alteredExpectedInputHash).not.toBe(refusedRecord.inputHash);
+    expect(chainVerification).toMatchObject({ valid: true, noJournalCreated: true, noAutomaticPosting: true, noExternalEffect: true });
+    expect(chainVerification.checks.some(check => check.independentInvariantValid && check.inputHashValid && check.outputHashValid && check.recordHashValid)).toBe(true);
     expect((await admin.journal.list({ ventureId })).length).toBe(journalCountBefore);
     const audits = await admin.audit({ ventureId });
     expect(audits.some(item => item.eventType === "accounting_event.procurement_receipt_emitted" && item.operationalRecordId === purchaseOrder!.id)).toBe(true);
     expect(audits.some(item => item.eventType === "journal_proposal.approved" && (item.payload as { noJournalCreated?: boolean }).noJournalCreated === true)).toBe(true);
+    expect(audits.some(item => item.eventType === "ledger_calculation_evidence.created" && (item.payload as { noJournalCreated?: boolean; noExternalEffect?: boolean }).noJournalCreated === true && (item.payload as { noExternalEffect?: boolean }).noExternalEffect === true)).toBe(true);
   }, 20_000);
 
   it("retains a supplier invoice reference once per active supplier and venture, rejects a duplicate, and records only internal evidence", async () => {
