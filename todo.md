@@ -74,6 +74,7 @@
 - [x] Add router-level negative country-pack tests proving payroll and public-budget mutations surface unselected or wrong-venture pack applicability rejection.
 - [x] Add explicit service proof that a jurisdiction-pack selection belonging to another venture is rejected for pack-dependent payroll and public-budget workflows.
 - [ ] Rehearse a pack-dependent payroll run only after a qualified local reviewer supplies an effective-dated, source-linked, reviewed and actively selected payroll pack for an authorized venture.
+- [x] Add a clearly labelled non-statutory payroll rehearsal preflight and process walkthrough that validates readiness evidence only, performs no payroll calculation, payment, filing, or legal/compliance assertion, and remains unable to satisfy the qualified reviewed-pack requirement.
 - [x] Reduce the main client bundle through route-level code splitting before a broad production rollout.
 - [x] Implement balanced draft/post journal batches with period-close guards, tenant-scoped accounts, and audit evidence.
 - [x] Implement balanced draft/post journal batches with period-close guards, tenant-scoped accounts, and audit evidence.

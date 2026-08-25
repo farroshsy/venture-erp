@@ -57,6 +57,7 @@ vi.mock("../erp/asia", () => ({
   createBudgetNode: vi.fn(),
   activateBudgetNode: vi.fn(),
   listPayrollCalendars: vi.fn(),
+  getPayrollRehearsalPreflight: vi.fn(),
   createPayrollCalendar: vi.fn(),
   activatePayrollCalendar: vi.fn(),
   listPayrollRuns: vi.fn(),
@@ -113,6 +114,13 @@ describe("operational ERP router", () => {
     await expect(caller().currencyPolicy.get({ ventureId: 21 })).resolves.toMatchObject({ reportingCurrency: "USD" });
     await expect(caller().currencyPolicy.setReportingCurrency({ ventureId: 21, reportingCurrency: "USD" })).resolves.toMatchObject({ reportingCurrency: "USD" });
     expect(service.setVentureReportingCurrency).toHaveBeenCalledWith({ ventureId: 21, reportingCurrency: "USD", actorUserId: 7 });
+  });
+  it("returns an evidence-only payroll rehearsal preflight after venture membership validation", async () => {
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "viewer", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(asia.getPayrollRehearsalPreflight).mockResolvedValue({ mode: "non_statutory_readiness_preflight", eligibleForPackDependentRehearsal: false, blockers: ["No effective reviewed pack."], boundaries: { payrollRunCreated: false, payrollCalculated: false, paymentExecuted: false, filingSubmitted: false, complianceClaimed: false } } as never);
+    await expect(caller().asia.payroll.rehearsalPreflight({ ventureId: 21, asOfDate: "2026-08-25" })).resolves.toMatchObject({ eligibleForPackDependentRehearsal: false, boundaries: { payrollCalculated: false, paymentExecuted: false, filingSubmitted: false } });
+    expect(requireVentureMembership).toHaveBeenCalledWith(7, 21);
+    expect(asia.getPayrollRehearsalPreflight).toHaveBeenCalledWith(21, "2026-08-25");
   });
   it("lists workflow instances and forwards a rejected task outcome through tenant-scoped workflow contracts", async () => {
     vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "operator", status: "active", createdAt: new Date(), updatedAt: new Date() });

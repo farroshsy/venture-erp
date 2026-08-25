@@ -178,6 +178,54 @@ export async function listPayrollCalendars(ventureId: number) {
   return db.select().from(erpPayrollCalendars).where(eq(erpPayrollCalendars.ventureId, ventureId)).orderBy(desc(erpPayrollCalendars.updatedAt));
 }
 
+export async function getPayrollRehearsalPreflight(ventureId: number, asOfDate = new Date().toISOString().slice(0, 10)) {
+  const db = await requireDb();
+  const [calendars, selections, packs] = await Promise.all([
+    db.select().from(erpPayrollCalendars).where(eq(erpPayrollCalendars.ventureId, ventureId)),
+    db.select().from(erpVentureJurisdictionSelections).where(and(eq(erpVentureJurisdictionSelections.ventureId, ventureId), eq(erpVentureJurisdictionSelections.purpose, "payroll"), eq(erpVentureJurisdictionSelections.status, "active"))),
+    db.select().from(erpJurisdictionPacks),
+  ]);
+  const packsById = new Map(packs.map(pack => [pack.id, pack]));
+  const activeCalendars = calendars.filter(calendar => calendar.status === "active");
+  const reviewedEffectivePackSelections = selections.filter(selection => {
+    const pack = packsById.get(selection.jurisdictionPackId);
+    return pack?.status === "approved" && Boolean(pack.reviewedAt) && Array.isArray(pack.sourceLinks) && pack.sourceLinks.length > 0 && pack.effectiveFrom <= asOfDate && (!pack.effectiveTo || pack.effectiveTo >= asOfDate);
+  });
+  const calendarEvidence = activeCalendars.map(calendar => ({
+    payrollCalendarId: calendar.id,
+    code: calendar.code,
+    name: calendar.name,
+    cadence: calendar.cadence,
+    workerCategory: calendar.workerCategory,
+    currency: calendar.currency,
+    jurisdictionPackId: calendar.jurisdictionPackId,
+    reviewedEffectivePackSelected: Boolean(calendar.jurisdictionPackId && reviewedEffectivePackSelections.some(selection => selection.jurisdictionPackId === calendar.jurisdictionPackId)),
+  }));
+  const blockers = [
+    ...(activeCalendars.length ? [] : ["No active payroll calendar is configured for this venture." ]),
+    ...(reviewedEffectivePackSelections.length ? [] : ["No effective-dated, source-linked, reviewed, actively selected payroll jurisdiction pack is available as of the requested date."]),
+    ...calendarEvidence.filter(calendar => !calendar.reviewedEffectivePackSelected).map(calendar => `Calendar ${calendar.code} is not linked to an effective reviewed payroll pack selection.`),
+  ];
+  return {
+    mode: "non_statutory_readiness_preflight" as const,
+    asOfDate,
+    eligibleForPackDependentRehearsal: blockers.length === 0,
+    blockers,
+    calendars: calendarEvidence,
+    reviewedEffectivePayrollPackSelections: reviewedEffectivePackSelections.map(selection => {
+      const pack = packsById.get(selection.jurisdictionPackId)!;
+      return { selectionId: selection.id, packId: pack.id, countryCode: pack.countryCode, version: pack.version, effectiveFrom: pack.effectiveFrom, effectiveTo: pack.effectiveTo, sourceLinkCount: Array.isArray(pack.sourceLinks) ? pack.sourceLinks.length : 0, reviewedAt: pack.reviewedAt };
+    }),
+    boundaries: {
+      payrollRunCreated: false,
+      payrollCalculated: false,
+      paymentExecuted: false,
+      filingSubmitted: false,
+      complianceClaimed: false,
+    },
+  };
+}
+
 export async function createPayrollRun(input: { ventureId: number; payrollCalendarId: number; periodStart: string; periodEnd: string; components: PayrollComponentInput[]; withholdingRateBasisPoints?: number; createdByUserId: number }) {
   const db = await requireDb();
   const calendars = await db.select().from(erpPayrollCalendars).where(and(eq(erpPayrollCalendars.id, input.payrollCalendarId), eq(erpPayrollCalendars.ventureId, input.ventureId), eq(erpPayrollCalendars.status, "active"))).limit(1);
