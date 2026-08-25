@@ -135,7 +135,7 @@ describe("typed-route sales lifecycle with real authorization", () => {
     const aging = await admin.invoice.aging({ ventureId, asOfDate: "2026-08-25" });
     expect(aging.asOfDate).toBe("2026-08-25");
     expect(aging.invoices.some(item => item.recordNumber === "VALIDATION-E2E-SUPPLIER-REFERENCE-AP-20260825" && item.bucket === "undated")).toBe(true);
-    expect(aging.summary.payable_invoice.undated).toBeGreaterThanOrEqual(25);
+    expect(aging.summary.payable_invoice.USD.undated).toBeGreaterThanOrEqual(25);
   }, 20_000);
 
   it("persists explicit jurisdiction-neutral people, delivery, asset, service, and CRM work controls with approval evidence", async () => {

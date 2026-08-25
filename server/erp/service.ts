@@ -321,12 +321,15 @@ export async function listInvoiceAging(ventureId: number, asOfDate: string) {
   const settlements = await listInvoiceSettlements(ventureId);
   const buckets: InvoiceAgingBucket[] = ["not_due", "1_30", "31_60", "61_90", "over_90", "undated"];
   const emptyTotals = () => Object.fromEntries(buckets.map(bucket => [bucket, 0])) as Record<InvoiceAgingBucket, number>;
-  const summary: Record<InvoiceType, Record<InvoiceAgingBucket, number>> = { receivable_invoice: emptyTotals(), payable_invoice: emptyTotals() };
+  const summary: Record<InvoiceType, Record<string, Record<InvoiceAgingBucket, number>>> = { receivable_invoice: {}, payable_invoice: {} };
   const invoices = settlements.filter(item => item.openAmount > 0).map(item => {
     const age = classifyInvoiceAge(item.invoice.dueDate ?? undefined, asOfDate);
     const invoiceType = item.invoice.recordType as InvoiceType;
-    summary[invoiceType][age.bucket] = normalizeMoney(summary[invoiceType][age.bucket] + item.openAmount);
-    return { invoiceId: item.invoice.id, recordNumber: item.invoice.recordNumber, title: item.invoice.title, invoiceType, dueDate: item.invoice.dueDate ?? null, openAmount: item.openAmount, currency: item.invoice.transactionCurrency, ...age };
+    const currency = item.invoice.transactionCurrency;
+    const currencyTotals = summary[invoiceType][currency] ?? emptyTotals();
+    currencyTotals[age.bucket] = normalizeMoney(currencyTotals[age.bucket] + item.openAmount);
+    summary[invoiceType][currency] = currencyTotals;
+    return { invoiceId: item.invoice.id, recordNumber: item.invoice.recordNumber, title: item.invoice.title, invoiceType, dueDate: item.invoice.dueDate ?? null, openAmount: item.openAmount, currency, ...age };
   });
   return { asOfDate, invoices, summary };
 }

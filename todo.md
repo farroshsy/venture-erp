@@ -118,3 +118,4 @@
 - [x] Add a finance-authorized Cash Control action that can approve only a successfully matched payable invoice, keeps mismatch approvals refused, and records no payment or external effect.
 - [x] Add tenant-scoped supplier-invoice-reference capture and duplicate prevention for payable invoices, with audit evidence and no external payment or supplier action.
 - [x] Add a tenant-scoped internal receivable/payable aging view based on retained open invoice evidence, with no collections, disbursements, credit decision, or external effect.
+- [x] Correct the internal invoice-aging view to separate buckets by retained transaction currency and prohibit cross-currency amount aggregation without approved FX/reporting evidence.
