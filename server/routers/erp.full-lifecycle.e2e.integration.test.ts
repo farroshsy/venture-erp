@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
-import { users, ventureMemberships } from "../../drizzle/schema";
+import { erpOperationalRecords, users, ventureMemberships } from "../../drizzle/schema";
 import type { TrpcContext } from "../_core/context";
 import { getDb } from "../db";
 import { erpRouter } from "./erp";
@@ -124,6 +124,8 @@ describe("typed-route sales lifecycle with real authorization", () => {
     let invoice = (await admin.invoice.settlements({ ventureId })).find(item => item.invoice.recordNumber === invoiceNumber)?.invoice;
     if (!invoice) invoice = await operator.invoice.create({ ventureId, invoiceType: "payable_invoice", recordNumber: invoiceNumber, title: "VALIDATION-ONLY supplier invoice reference", counterpartyMasterId: supplier.id, amount: 25, effectiveDate: "2026-08-25", supplierInvoiceReference: supplierReference, data: { validationOnly: true, noExternalDisbursement: true } });
     await expect(operator.invoice.create({ ventureId, invoiceType: "payable_invoice", recordNumber: duplicateNumber, title: "VALIDATION-ONLY duplicate supplier reference", counterpartyMasterId: supplier.id, amount: 25, effectiveDate: "2026-08-25", supplierInvoiceReference: supplierReference.toLowerCase(), data: { validationOnly: true, noExternalDisbursement: true } })).rejects.toThrow("already exists");
+    const db = await getDb(); if (!db) throw new Error("Database is not available.");
+    await expect(db.insert(erpOperationalRecords).values({ ventureId, domain: "procurement", recordType: "payable_invoice", recordNumber: "VALIDATION-E2E-SUPPLIER-REFERENCE-DB-UNIQUE-20260825", title: "VALIDATION-ONLY database uniqueness probe", status: "draft", counterpartyMasterId: supplier.id, amount: "25", taxAmount: "0", totalAmount: "25", transactionCurrency: "USD", functionalCurrency: "USD", functionalAmount: "25", effectiveDate: "2026-08-25", supplierInvoiceReferenceNormalized: supplierReference, data: { validationOnly: true, directDatabaseConstraintProbe: true, noExternalDisbursement: true }, createdByUserId: operatorUserId })).rejects.toThrow();
     const records = await admin.records.list({ ventureId }); const audits = await admin.audit({ ventureId });
     const retained = records.find(record => record.id === invoice!.id)!;
     expect(retained.data).toMatchObject({ supplierInvoiceReference: supplierReference, supplierInvoiceReferenceNormalized: supplierReference });

@@ -1,0 +1,3 @@
+ALTER TABLE `erp_operational_records` ADD `supplierInvoiceReferenceNormalized` varchar(160);--> statement-breakpoint
+UPDATE `erp_operational_records` SET `supplierInvoiceReferenceNormalized` = UPPER(JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.supplierInvoiceReferenceNormalized'))) WHERE `recordType` = 'payable_invoice' AND JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.supplierInvoiceReferenceNormalized')) IS NOT NULL AND JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.supplierInvoiceReferenceNormalized')) <> '';--> statement-breakpoint
+ALTER TABLE `erp_operational_records` ADD CONSTRAINT `erp_payable_supplier_reference_unique` UNIQUE(`ventureId`,`counterpartyMasterId`,`supplierInvoiceReferenceNormalized`);

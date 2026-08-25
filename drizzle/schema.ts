@@ -314,6 +314,7 @@ export const erpOperationalRecords = mysqlTable("erp_operational_records", {
   reportingAmount: decimal("reportingAmount", { precision: 18, scale: 2 }),
   effectiveDate: varchar("effectiveDate", { length: 10 }).notNull(),
   dueDate: varchar("dueDate", { length: 10 }),
+  supplierInvoiceReferenceNormalized: varchar("supplierInvoiceReferenceNormalized", { length: 160 }),
   data: json("data").notNull(),
   createdByUserId: int("createdByUserId").notNull().references(() => users.id),
   approvedByUserId: int("approvedByUserId").references(() => users.id),
@@ -322,6 +323,7 @@ export const erpOperationalRecords = mysqlTable("erp_operational_records", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => [
   uniqueIndex("erp_operational_venture_record_unique").on(table.ventureId, table.recordNumber),
+  uniqueIndex("erp_payable_supplier_reference_unique").on(table.ventureId, table.counterpartyMasterId, table.supplierInvoiceReferenceNormalized),
   index("erp_operational_venture_domain_status_idx").on(table.ventureId, table.domain, table.status),
 ]);
 

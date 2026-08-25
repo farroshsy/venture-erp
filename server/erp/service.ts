@@ -126,7 +126,7 @@ export async function listBudgetEnvelopes(ventureId: number) {
   return db.select().from(erpBudgetEnvelopes).where(eq(erpBudgetEnvelopes.ventureId, ventureId)).orderBy(desc(erpBudgetEnvelopes.updatedAt));
 }
 
-export async function createOperationalRecord(input: { ventureId: number; domain: OperationalDomain; recordType: string; recordNumber: string; title: string; counterpartyMasterId?: number; accountingPeriodId?: number; budgetEnvelopeId?: number; publicBudgetNodeId?: number; taxPolicyId?: number; transactionCurrency?: string; functionalCurrency?: string; exchangeRateId?: number; reportingExchangeRateId?: number; amount: number; effectiveDate: string; dueDate?: string; data: Record<string, unknown>; createdByUserId: number }) {
+export async function createOperationalRecord(input: { ventureId: number; domain: OperationalDomain; recordType: string; recordNumber: string; title: string; counterpartyMasterId?: number; accountingPeriodId?: number; budgetEnvelopeId?: number; publicBudgetNodeId?: number; taxPolicyId?: number; transactionCurrency?: string; functionalCurrency?: string; exchangeRateId?: number; reportingExchangeRateId?: number; amount: number; effectiveDate: string; dueDate?: string; supplierInvoiceReferenceNormalized?: string; data: Record<string, unknown>; createdByUserId: number }) {
   const db = await requireDb();
   const amount = normalizeMoney(input.amount);
   const ventureRows = await db.select({ baseCurrency: ventures.baseCurrency, reportingCurrency: ventures.reportingCurrency }).from(ventures).where(eq(ventures.id, input.ventureId)).limit(1);
@@ -222,10 +222,16 @@ export async function createInvoiceRecord(input: { ventureId: number; invoiceTyp
   const supplierInvoiceReferenceNormalized = supplierInvoiceReference?.toUpperCase();
   if (supplierInvoiceReferenceNormalized) {
     const payableInvoices = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.ventureId, input.ventureId), eq(erpOperationalRecords.recordType, "payable_invoice")));
-    const duplicate = payableInvoices.find(record => record.counterpartyMasterId === input.counterpartyMasterId && (record.data as { supplierInvoiceReferenceNormalized?: unknown }).supplierInvoiceReferenceNormalized === supplierInvoiceReferenceNormalized);
+    const duplicate = payableInvoices.find(record => record.counterpartyMasterId === input.counterpartyMasterId && (record.supplierInvoiceReferenceNormalized === supplierInvoiceReferenceNormalized || (record.data as { supplierInvoiceReferenceNormalized?: unknown }).supplierInvoiceReferenceNormalized === supplierInvoiceReferenceNormalized));
     if (duplicate) throw new Error("A payable invoice with this supplier invoice reference already exists for the active supplier in this venture.");
   }
-  const invoice = await createOperationalRecord({ ventureId: input.ventureId, domain: input.invoiceType === "receivable_invoice" ? "sales" : "procurement", recordType: input.invoiceType, recordNumber: input.recordNumber, title: input.title, counterpartyMasterId: input.counterpartyMasterId, accountingPeriodId: input.accountingPeriodId, taxPolicyId: input.taxPolicyId, amount: input.amount, effectiveDate: input.effectiveDate, dueDate: input.dueDate, data: { ...input.data, invoiceType: input.invoiceType, ...(supplierInvoiceReference ? { supplierInvoiceReference, supplierInvoiceReferenceNormalized } : {}), noExternalCollectionOrDisbursement: true }, createdByUserId: input.createdByUserId });
+  let invoice: Awaited<ReturnType<typeof createOperationalRecord>>;
+  try {
+    invoice = await createOperationalRecord({ ventureId: input.ventureId, domain: input.invoiceType === "receivable_invoice" ? "sales" : "procurement", recordType: input.invoiceType, recordNumber: input.recordNumber, title: input.title, counterpartyMasterId: input.counterpartyMasterId, accountingPeriodId: input.accountingPeriodId, taxPolicyId: input.taxPolicyId, amount: input.amount, effectiveDate: input.effectiveDate, dueDate: input.dueDate, supplierInvoiceReferenceNormalized, data: { ...input.data, invoiceType: input.invoiceType, ...(supplierInvoiceReference ? { supplierInvoiceReference, supplierInvoiceReferenceNormalized } : {}), noExternalCollectionOrDisbursement: true }, createdByUserId: input.createdByUserId });
+  } catch (error) {
+    if (supplierInvoiceReferenceNormalized && String(error).includes("erp_payable_supplier_reference_unique")) throw new Error("A payable invoice with this supplier invoice reference already exists for the active supplier in this venture.");
+    throw error;
+  }
   if (supplierInvoiceReferenceNormalized) await createAuditEvent({ ventureId: input.ventureId, domain: "finance", operationalRecordId: invoice.id, eventType: "payable_invoice.supplier_reference_recorded", actorUserId: input.createdByUserId, payload: { supplierMasterId: input.counterpartyMasterId, supplierInvoiceReference, supplierInvoiceReferenceNormalized, noExternalSupplierAction: true, noPaymentExecution: true } });
   return invoice;
 }
