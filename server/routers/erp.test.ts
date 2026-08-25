@@ -178,14 +178,18 @@ describe("operational ERP router", () => {
   it("keeps finance-owned posting rules and journal proposals inside tenant-scoped finance authorization", async () => {
     vi.mocked(requireVentureRole).mockReset();
     vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
-    vi.mocked(service.listAccountingControl).mockResolvedValue({ events: [], rules: [], proposals: [] } as never);
+    vi.mocked(service.listAccountingControl).mockResolvedValue({ events: [], rules: [{ id: 91, ruleCode: "PROC_RECEIPT", revision: 1, status: "approved", lineConfiguration: [{ entrySide: "debit", accountMasterId: 10, allocationBasisPoints: 10_000, narrative: "Inventory receipt" }, { entrySide: "credit", accountMasterId: 11, allocationBasisPoints: 10_000, narrative: "Receipt clearing" }], requiredDimensions: ["sourceOperationalRecordId"] }], proposals: [] } as never);
     vi.mocked(service.createPostingRuleRevision).mockResolvedValue({ id: 91, revision: 1, status: "draft" } as never);
     vi.mocked(service.approvePostingRuleRevision).mockResolvedValue({ id: 91, status: "approved" } as never);
     vi.mocked(service.createAccountingCalculationEvidence).mockResolvedValue({ id: 93, calculationKey: "CALC-SIM-1", recordHash: "a".repeat(64), status: "completed", simulation: {} } as never);
     vi.mocked(service.listAccountingCalculationEvidence).mockResolvedValue([{ id: 93, calculationKey: "CALC-SIM-1", status: "completed" }] as never);
     vi.mocked(service.verifyAccountingCalculationEvidenceChain).mockResolvedValue({ ventureId: 21, recordCount: 1, valid: true, checks: [], noJournalCreated: true, noAutomaticPosting: true, noExternalEffect: true } as never);
     vi.mocked(service.reviewJournalProposal).mockResolvedValue({ id: 92, status: "approved", noJournalCreated: true } as never);
-    await expect(caller().accountingControl.overview({ ventureId: 21 })).resolves.toMatchObject({ events: [] });
+    const overview = await caller().accountingControl.overview({ ventureId: 21 });
+    expect(overview.events).toEqual([]);
+    const exposedRule = overview.rules[0] as { lineConfiguration: Array<{ allocationBasisPoints: number; entrySide: string }>; requiredDimensions: string[] };
+    expect(exposedRule.lineConfiguration[0]).toMatchObject({ entrySide: "debit", allocationBasisPoints: 10_000 });
+    expect(exposedRule.requiredDimensions).toEqual(["sourceOperationalRecordId"]);
     await expect(caller().accountingControl.createPostingRuleRevision({ ventureId: 21, ruleCode: "PROC_RECEIPT", ruleName: "Internal procurement receipt", eventType: "procurement_receipt", effectiveFrom: "2026-08-25", debitAccountMasterId: 10, creditAccountMasterId: 11, debitAllocations: [{ accountMasterId: 10, allocationBasisPoints: 6_000, narrative: "Inventory allocation" }, { accountMasterId: 12, allocationBasisPoints: 4_000, narrative: "Receiving allocation" }], changeRationale: "Validation-only controlled mapping" })).resolves.toMatchObject({ id: 91, status: "draft" });
     await expect(caller().accountingControl.approvePostingRuleRevision({ ventureId: 21, postingRuleRevisionId: 91 })).resolves.toMatchObject({ status: "approved" });
     await expect(caller().accountingControl.createCalculationEvidence({ ventureId: 21, accountingEventId: 90, rationale: "Immutable validation evidence only." })).resolves.toMatchObject({ calculationKey: "CALC-SIM-1", status: "completed" });

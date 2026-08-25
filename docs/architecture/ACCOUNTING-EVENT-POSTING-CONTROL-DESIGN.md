@@ -28,6 +28,8 @@ The initial proposal engine now supports one or more debit percentage allocation
 
 Journal Control now exposes this existing bounded vocabulary directly to finance-authorized users. Its rule editor lets finance add or remove debit allocation lines, select a tenant chart-of-accounts master, state an integer basis-point allocation and line narrative, and see the live debit total against 10,000 basis points. It will not submit unless every line is complete, the debit total is exactly 10,000, and no debit allocation reuses the balancing credit account. The server repeats the balancing-credit account guard and continues to validate active same-tenant accounts and exact percentage totals; the UI is not a substitute for those controls.
 
+The rule register now also renders the retained `lineConfiguration` and source requirements from every revision as a read-only explanation surface. It identifies debit/credit side, selected account, basis points, narrative, and retained source requirements exactly as stored in the revision. The surface has no edit action: a material policy change still requires a new finance-owned revision, while proposal conversion and journal posting remain absent from this control engine.
+
 This is intentionally not a valuation, landed-cost, weight, volume, driver, cost-pool, fixed-amount, quantity, or labor/machine-hour allocation engine. Those allocation types require separate finance policy, source-data contracts, and controlled tests before adoption. No allocation creates or posts a journal, changes balances, calculates tax/payroll, issues a payment, files, or transmits externally.
 
 ## 0.4 Read-only ledger-simulation design
