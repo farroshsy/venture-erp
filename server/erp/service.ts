@@ -1,5 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import {
+  erpAccountingEvents,
   erpAccountingPeriods,
   erpAuditEvents,
   erpBudgetEnvelopes,
@@ -12,6 +13,7 @@ import {
   erpInventoryBalances,
   erpInventoryMovements,
   erpJournalLines,
+  erpJournalProposals,
   erpJournals,
   erpLedgerEntries,
   erpMaintenanceWorkOrders,
@@ -19,6 +21,7 @@ import {
   erpOperationalRecords,
   erpPayrollCalendars,
   erpPayrollRuns,
+  erpPostingRuleRevisions,
   erpProjects,
   erpProjectTasks,
   erpServiceRequests,
@@ -33,11 +36,28 @@ import { availableBudget, calculateTax, canTransition, convertCurrency, normaliz
 
 export type MasterDomain = "customer" | "supplier" | "item" | "employee" | "account" | "project" | "asset" | "location" | "compensation_component" | "tax_category";
 export type OperationalDomain = "finance" | "sales" | "procurement" | "inventory" | "people" | "payroll" | "projects" | "assets" | "service" | "crm";
+export type PostingRuleLine = { entrySide: "debit" | "credit"; accountMasterId: number; narrative: string };
 
 async function requireDb() {
   const db = await getDb();
   if (!db) throw new Error("Database is not available.");
   return db;
+}
+
+function asPostingRuleLines(value: unknown): PostingRuleLine[] {
+  if (!Array.isArray(value) || value.length !== 2) throw new Error("Posting rules require exactly one debit and one credit line in the initial controlled vocabulary.");
+  const lines = value as PostingRuleLine[];
+  if (lines.filter(line => line.entrySide === "debit").length !== 1 || lines.filter(line => line.entrySide === "credit").length !== 1) throw new Error("Posting rules require exactly one debit and one credit line.");
+  for (const line of lines) {
+    if (!Number.isInteger(line.accountMasterId) || line.accountMasterId <= 0 || !line.narrative?.trim()) throw new Error("Posting-rule lines require an active account and narrative.");
+  }
+  return lines.map(line => ({ entrySide: line.entrySide, accountMasterId: line.accountMasterId, narrative: line.narrative.trim() }));
+}
+
+async function requireAccountMaster(db: Awaited<ReturnType<typeof requireDb>>, ventureId: number, accountMasterId: number) {
+  const [account] = await db.select().from(erpMasterRecords).where(and(eq(erpMasterRecords.id, accountMasterId), eq(erpMasterRecords.ventureId, ventureId))).limit(1);
+  if (!account || account.domain !== "account" || account.status !== "active") throw new Error("Posting-rule accounts must be active chart-of-accounts masters in the active venture.");
+  return account;
 }
 
 export async function createMasterRecord(input: { ventureId: number; domain: MasterDomain; code: string; name: string; attributes: Record<string, unknown>; createdByUserId: number }) {
@@ -452,6 +472,109 @@ export async function postJournal(input: { ventureId: number; journalId: number;
   return { id: journal.id, status: "posted" as const };
 }
 
+export async function createPostingRuleRevision(input: { ventureId: number; ruleCode: string; ruleName: string; eventType: "procurement_receipt"; effectiveFrom: string; effectiveTo?: string; debitAccountMasterId: number; creditAccountMasterId: number; changeRationale: string; adrReference?: string; createdByUserId: number }) {
+  if (!input.ruleCode.trim() || !input.ruleName.trim() || !input.changeRationale.trim()) throw new Error("Posting-rule code, name, and rationale are required.");
+  if (input.effectiveTo && input.effectiveTo < input.effectiveFrom) throw new Error("Posting-rule effective end date cannot precede its effective start date.");
+  const db = await requireDb();
+  await requireAccountMaster(db, input.ventureId, input.debitAccountMasterId);
+  await requireAccountMaster(db, input.ventureId, input.creditAccountMasterId);
+  if (input.debitAccountMasterId === input.creditAccountMasterId) throw new Error("Posting-rule debit and credit accounts must be distinct.");
+  const existing = await db.select().from(erpPostingRuleRevisions).where(and(eq(erpPostingRuleRevisions.ventureId, input.ventureId), eq(erpPostingRuleRevisions.ruleCode, input.ruleCode.trim()))).orderBy(desc(erpPostingRuleRevisions.revision));
+  const revision = (existing[0]?.revision ?? 0) + 1;
+  const lineConfiguration = asPostingRuleLines([
+    { entrySide: "debit", accountMasterId: input.debitAccountMasterId, narrative: "Internal procurement receipt — inventory/receipt clearing debit" },
+    { entrySide: "credit", accountMasterId: input.creditAccountMasterId, narrative: "Internal procurement receipt — inventory/receipt clearing credit" },
+  ]);
+  const result = await db.insert(erpPostingRuleRevisions).values({ ventureId: input.ventureId, ruleCode: input.ruleCode.trim(), ruleName: input.ruleName.trim(), eventType: input.eventType, revision, effectiveFrom: input.effectiveFrom, effectiveTo: input.effectiveTo, status: "draft", lineConfiguration, requiredDimensions: ["sourceOperationalRecordId", "sourceInventoryMovementId", "itemMasterId", "supplierMasterId"], changeRationale: input.changeRationale.trim(), adrReference: input.adrReference?.trim() || null, createdByUserId: input.createdByUserId });
+  const id = Number(result[0].insertId);
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: "posting_rule_revision.created", actorUserId: input.createdByUserId, payload: { postingRuleRevisionId: id, ruleCode: input.ruleCode.trim(), revision, eventType: input.eventType, noAutomaticPosting: true, noExternalEffect: true } });
+  return { id, revision, status: "draft" as const, lineConfiguration };
+}
+
+export async function approvePostingRuleRevision(input: { ventureId: number; postingRuleRevisionId: number; actorUserId: number }) {
+  const db = await requireDb();
+  const [revision] = await db.select().from(erpPostingRuleRevisions).where(and(eq(erpPostingRuleRevisions.id, input.postingRuleRevisionId), eq(erpPostingRuleRevisions.ventureId, input.ventureId))).limit(1);
+  if (!revision) throw new Error("Posting-rule revision not found in the active venture.");
+  if (revision.status !== "draft" && revision.status !== "reviewed") throw new Error("Only draft or reviewed posting-rule revisions may be approved.");
+  const siblings = await db.select().from(erpPostingRuleRevisions).where(and(eq(erpPostingRuleRevisions.ventureId, input.ventureId), eq(erpPostingRuleRevisions.ruleCode, revision.ruleCode), eq(erpPostingRuleRevisions.status, "approved")));
+  const overlaps = siblings.some(item => item.effectiveFrom <= (revision.effectiveTo ?? "9999-12-31") && (item.effectiveTo ?? "9999-12-31") >= revision.effectiveFrom);
+  if (overlaps) throw new Error("Approved posting-rule revisions for the same rule code cannot have overlapping effective dates.");
+  await db.update(erpPostingRuleRevisions).set({ status: "approved", approvedByUserId: input.actorUserId, approvedAt: new Date() }).where(eq(erpPostingRuleRevisions.id, revision.id));
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: "posting_rule_revision.approved", actorUserId: input.actorUserId, payload: { postingRuleRevisionId: revision.id, ruleCode: revision.ruleCode, revision: revision.revision, noAutomaticPosting: true, noExternalEffect: true } });
+  return { id: revision.id, status: "approved" as const };
+}
+
+export async function listPostingRuleRevisions(ventureId: number) {
+  const db = await requireDb();
+  return db.select().from(erpPostingRuleRevisions).where(eq(erpPostingRuleRevisions.ventureId, ventureId)).orderBy(desc(erpPostingRuleRevisions.createdAt));
+}
+
+export async function emitProcurementReceiptAccountingEvent(input: { ventureId: number; purchaseOrderRecordId: number; inventoryMovementId: number; actorUserId: number }) {
+  const db = await requireDb();
+  const [purchaseOrder] = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.id, input.purchaseOrderRecordId), eq(erpOperationalRecords.ventureId, input.ventureId))).limit(1);
+  if (!purchaseOrder || purchaseOrder.domain !== "procurement" || purchaseOrder.recordType !== "purchase_order" || !["posted", "fulfilled"].includes(purchaseOrder.status)) throw new Error("A posted or fulfilled procurement purchase order is required to emit a receipt accounting event.");
+  const [movement] = await db.select().from(erpInventoryMovements).where(and(eq(erpInventoryMovements.id, input.inventoryMovementId), eq(erpInventoryMovements.ventureId, input.ventureId), eq(erpInventoryMovements.operationalRecordId, purchaseOrder.id), eq(erpInventoryMovements.movementType, "receipt"))).limit(1);
+  if (!movement) throw new Error("Recorded receipt evidence was not found for the active purchase order.");
+  const eventKey = `PROC-RECEIPT-${movement.id}`;
+  const [existing] = await db.select().from(erpAccountingEvents).where(and(eq(erpAccountingEvents.ventureId, input.ventureId), eq(erpAccountingEvents.eventKey, eventKey))).limit(1);
+  if (existing) return { ...existing, idempotent: true as const };
+  const result = await db.insert(erpAccountingEvents).values({ ventureId: input.ventureId, eventKey, eventType: "procurement_receipt", sourceDomain: "procurement", sourceOperationalRecordId: purchaseOrder.id, sourceInventoryMovementId: movement.id, accountingPeriodId: purchaseOrder.accountingPeriodId, accountingDate: purchaseOrder.effectiveDate, transactionCurrency: purchaseOrder.transactionCurrency, functionalCurrency: purchaseOrder.functionalCurrency, amount: String(normalizeMoney(Number(purchaseOrder.totalAmount))), functionalAmount: String(normalizeMoney(Number(purchaseOrder.functionalAmount))), sourceSnapshot: { recordNumber: purchaseOrder.recordNumber, status: purchaseOrder.status, totalAmount: purchaseOrder.totalAmount, functionalAmount: purchaseOrder.functionalAmount, receiptQuantity: movement.quantity, receiptNarrative: movement.narrative }, dimensionsSnapshot: { sourceModule: "procurement", sourceOperationalRecordId: purchaseOrder.id, sourceInventoryMovementId: movement.id, supplierMasterId: purchaseOrder.counterpartyMasterId ?? null, itemMasterId: movement.itemMasterId, warehouse: null, project: null }, evidenceSnapshot: { inventoryMovementId: movement.id, noTaxDetermination: true, noPaymentExecution: true, noExternalEffect: true }, emittedByUserId: input.actorUserId });
+  const id = Number(result[0].insertId);
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", operationalRecordId: purchaseOrder.id, eventType: "accounting_event.procurement_receipt_emitted", actorUserId: input.actorUserId, payload: { accountingEventId: id, eventKey, inventoryMovementId: movement.id, noAutomaticJournalPosting: true, noTaxDetermination: true, noPaymentExecution: true, noExternalEffect: true } });
+  return { id, eventKey, eventType: "procurement_receipt" as const, idempotent: false as const };
+}
+
+export async function evaluateAccountingEventToProposal(input: { ventureId: number; accountingEventId: number; actorUserId: number }) {
+  const db = await requireDb();
+  const [event] = await db.select().from(erpAccountingEvents).where(and(eq(erpAccountingEvents.id, input.accountingEventId), eq(erpAccountingEvents.ventureId, input.ventureId))).limit(1);
+  if (!event) throw new Error("Accounting event not found in the active venture.");
+  const candidates = (await db.select().from(erpPostingRuleRevisions).where(and(eq(erpPostingRuleRevisions.ventureId, input.ventureId), eq(erpPostingRuleRevisions.eventType, event.eventType), eq(erpPostingRuleRevisions.status, "approved")))).filter(rule => rule.effectiveFrom <= event.accountingDate && (rule.effectiveTo === null || rule.effectiveTo >= event.accountingDate));
+  if (candidates.length !== 1) {
+    const proposalNumber = `JP-REF-${event.id}`;
+    const [existing] = await db.select().from(erpJournalProposals).where(and(eq(erpJournalProposals.ventureId, input.ventureId), eq(erpJournalProposals.proposalNumber, proposalNumber))).limit(1);
+    if (existing) return existing;
+    const reasons = candidates.length === 0 ? ["No approved effective-dated posting rule matches this accounting event."] : ["More than one approved effective-dated posting rule matches this accounting event."];
+    const result = await db.insert(erpJournalProposals).values({ ventureId: input.ventureId, proposalNumber, accountingEventId: event.id, accountingPeriodId: event.accountingPeriodId, status: "refused", currency: event.functionalCurrency, proposalSnapshot: { accountingEventId: event.id, eventKey: event.eventKey, noJournalCreated: true }, refusalReasons: reasons, createdByUserId: input.actorUserId });
+    const id = Number(result[0].insertId);
+    await createAuditEvent({ ventureId: input.ventureId, domain: "finance", operationalRecordId: event.sourceOperationalRecordId, eventType: "journal_proposal.refused", actorUserId: input.actorUserId, payload: { journalProposalId: id, accountingEventId: event.id, reasons, noAutomaticJournalPosting: true, noExternalEffect: true } });
+    return { id, status: "refused" as const, refusalReasons: reasons };
+  }
+  const rule = candidates[0];
+  const [existing] = await db.select().from(erpJournalProposals).where(and(eq(erpJournalProposals.accountingEventId, event.id), eq(erpJournalProposals.postingRuleRevisionId, rule.id))).limit(1);
+  if (existing) return existing;
+  if (!event.accountingPeriodId) throw new Error("Procurement receipt accounting events require an accounting period before a proposal can be generated.");
+  await requirePeriod(db, input.ventureId, event.accountingPeriodId);
+  const lines = asPostingRuleLines(rule.lineConfiguration).map(line => ({ ...line, amount: normalizeMoney(Number(event.functionalAmount)) }));
+  for (const line of lines) await requireAccountMaster(db, input.ventureId, line.accountMasterId);
+  validateBalancedJournal(lines);
+  const proposalNumber = `JP-${event.id}-R${rule.revision}`;
+  const result = await db.insert(erpJournalProposals).values({ ventureId: input.ventureId, proposalNumber, accountingEventId: event.id, postingRuleRevisionId: rule.id, accountingPeriodId: event.accountingPeriodId, status: "pending_review", currency: event.functionalCurrency, proposalSnapshot: { accountingEventId: event.id, eventKey: event.eventKey, sourceOperationalRecordId: event.sourceOperationalRecordId, sourceInventoryMovementId: event.sourceInventoryMovementId, postingRuleRevisionId: rule.id, ruleCode: rule.ruleCode, ruleRevision: rule.revision, functionalAmount: event.functionalAmount, dimensions: event.dimensionsSnapshot, lines, noJournalCreated: true, noAutomaticPosting: true, noExternalEffect: true }, refusalReasons: [], createdByUserId: input.actorUserId });
+  const id = Number(result[0].insertId);
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", operationalRecordId: event.sourceOperationalRecordId, eventType: "journal_proposal.generated", actorUserId: input.actorUserId, payload: { journalProposalId: id, accountingEventId: event.id, postingRuleRevisionId: rule.id, noJournalCreated: true, noAutomaticPosting: true, noExternalEffect: true } });
+  return { id, proposalNumber, status: "pending_review" as const, lines };
+}
+
+export async function reviewJournalProposal(input: { ventureId: number; journalProposalId: number; decision: "approved" | "rejected"; note: string; actorUserId: number }) {
+  const db = await requireDb();
+  const [proposal] = await db.select().from(erpJournalProposals).where(and(eq(erpJournalProposals.id, input.journalProposalId), eq(erpJournalProposals.ventureId, input.ventureId))).limit(1);
+  if (!proposal) throw new Error("Journal proposal not found in the active venture.");
+  if (proposal.status !== "pending_review") throw new Error("Only pending-review journal proposals may be reviewed.");
+  if (!input.note.trim()) throw new Error("Journal proposal review requires a note.");
+  await db.update(erpJournalProposals).set({ status: input.decision, reviewedByUserId: input.actorUserId, reviewedAt: new Date(), reviewNote: input.note.trim() }).where(eq(erpJournalProposals.id, proposal.id));
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: `journal_proposal.${input.decision}`, actorUserId: input.actorUserId, payload: { journalProposalId: proposal.id, accountingEventId: proposal.accountingEventId, note: input.note.trim(), noJournalCreated: true, noAutomaticPosting: true, noExternalEffect: true } });
+  return { id: proposal.id, status: input.decision, noJournalCreated: true as const };
+}
+
+export async function listAccountingControl(ventureId: number) {
+  const db = await requireDb();
+  const [events, rules, proposals] = await Promise.all([
+    db.select().from(erpAccountingEvents).where(eq(erpAccountingEvents.ventureId, ventureId)).orderBy(desc(erpAccountingEvents.createdAt)),
+    db.select().from(erpPostingRuleRevisions).where(eq(erpPostingRuleRevisions.ventureId, ventureId)).orderBy(desc(erpPostingRuleRevisions.createdAt)),
+    db.select().from(erpJournalProposals).where(eq(erpJournalProposals.ventureId, ventureId)).orderBy(desc(erpJournalProposals.updatedAt)),
+  ]);
+  return { events, rules, proposals };
+}
+
 export type InventoryMovementType = "receipt" | "issue" | "adjust_in" | "adjust_out" | "reserve" | "release";
 export type WorkflowTrigger = { event: "operational_record.transitioned"; domain?: OperationalDomain; recordType?: string; targetStatus: OperationalStatus };
 
@@ -515,7 +638,13 @@ export async function receivePurchaseOrder(input: { ventureId: number; purchaseO
     await db.update(erpOperationalRecords).set({ status, updatedAt: new Date() }).where(eq(erpOperationalRecords.id, purchaseOrder.id));
   }
   await createAuditEvent({ ventureId: input.ventureId, domain: "procurement", operationalRecordId: purchaseOrder.id, eventType: "purchase_order.received", actorUserId: input.actorUserId, payload: { itemMasterId: input.itemMasterId, quantity: receipt.quantity, inventoryMovementId: receipt.id, finalReceipt: Boolean(input.finalReceipt), resultingStatus: status } });
-  return { purchaseOrderRecordId: purchaseOrder.id, inventoryMovementId: receipt.id, quantity: receipt.quantity, status, finalReceipt: Boolean(input.finalReceipt) };
+  const accountingControl = input.finalReceipt
+    ? await emitProcurementReceiptAccountingEvent({ ventureId: input.ventureId, purchaseOrderRecordId: purchaseOrder.id, inventoryMovementId: receipt.id, actorUserId: input.actorUserId })
+    : undefined;
+  const proposal = accountingControl && !accountingControl.idempotent
+    ? await evaluateAccountingEventToProposal({ ventureId: input.ventureId, accountingEventId: accountingControl.id, actorUserId: input.actorUserId })
+    : undefined;
+  return { purchaseOrderRecordId: purchaseOrder.id, inventoryMovementId: receipt.id, quantity: receipt.quantity, status, finalReceipt: Boolean(input.finalReceipt), accountingEvent: accountingControl, journalProposal: proposal, noAutomaticJournalPosting: Boolean(accountingControl), noExternalEffect: Boolean(accountingControl) };
 }
 
 export async function reserveSalesOrderInventory(input: { ventureId: number; salesOrderRecordId: number; itemMasterId: number; quantity: number; narrative: string; actorUserId: number }) {

@@ -1,6 +1,12 @@
 # Accounting Event → Posting Rule → Journal Proposal Control Design
 
-> **Design status:** Draft architecture only. This document does not activate automatic posting, change the current general ledger, create accounting entries, execute payments, transmit data externally, or make payroll/tax/compliance determinations.
+> **Implementation status:** The first bounded non-payroll procurement-receipt control is implemented. It emits immutable internal events, evaluates approved effective-dated finance rules, and creates human-reviewed journal proposals only. It does **not** activate automatic posting, create or post an authoritative journal, execute payments, transmit data externally, or make payroll/tax/compliance determinations.
+
+## 0. First implementation status
+
+Migration `0017_condemned_leper_queen.sql` adds tenant-scoped immutable accounting events, finance-owned effective-dated posting-rule revisions, and journal proposals. A final internal purchase-order receipt emits a `procurement_receipt` event with source, inventory-movement, period, currency, dimension, and evidence snapshots. One approved effective-dated deterministic debit/credit rule may yield a balanced `pending_review` proposal; zero or multiple matching rules yield durable refusal evidence.
+
+The implemented initial selector vocabulary is intentionally narrower than the target design: exactly one literal active debit account and one literal active credit account, each using the retained functional event amount. A finance reviewer can approve or reject a proposal, but no proposal converts into, creates, or posts an `erp_journals` record. Future selector types, multi-line splits, valuation policy, and conversion must remain separately governed increments.
 
 ## 1. Purpose and boundary
 

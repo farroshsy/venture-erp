@@ -120,6 +120,13 @@
       "when": 1787627046285,
       "tag": "0016_married_rawhide_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1787628986438,
+      "tag": "0017_condemned_leper_queen",
+      "breakpoints": true
     }
   ]
 }

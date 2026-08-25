@@ -23,6 +23,11 @@ vi.mock("../erp/service", () => ({
   listJournals: vi.fn(),
   createJournal: vi.fn(),
   postJournal: vi.fn(),
+  listAccountingControl: vi.fn(),
+  createPostingRuleRevision: vi.fn(),
+  approvePostingRuleRevision: vi.fn(),
+  evaluateAccountingEventToProposal: vi.fn(),
+  reviewJournalProposal: vi.fn(),
   listInventoryBalances: vi.fn(),
   listInventoryMovements: vi.fn(),
   recordInventoryMovement: vi.fn(),
@@ -160,6 +165,20 @@ describe("operational ERP router", () => {
     vi.mocked(service.createJournal).mockResolvedValue({ id: 71, status: "draft", debit: 100, credit: 100, lineCount: 2 } as never);
     await expect(caller().journal.create({ ventureId: 21, journalNumber: "JRN-001", accountingPeriodId: 4, currency: "IDR", narrative: "Opening entry", lines: [{ accountMasterId: 10, entrySide: "debit", amount: 100, narrative: "Cash" }, { accountMasterId: 11, entrySide: "credit", amount: 100, narrative: "Capital" }] })).resolves.toMatchObject({ id: 71, status: "draft" });
     expect(service.createJournal).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, accountingPeriodId: 4, currency: "IDR", createdByUserId: 7, lines: expect.arrayContaining([expect.objectContaining({ entrySide: "debit" }), expect.objectContaining({ entrySide: "credit" })]) }));
+  });
+  it("keeps finance-owned posting rules and journal proposals inside tenant-scoped finance authorization", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.listAccountingControl).mockResolvedValue({ events: [], rules: [], proposals: [] } as never);
+    vi.mocked(service.createPostingRuleRevision).mockResolvedValue({ id: 91, revision: 1, status: "draft" } as never);
+    vi.mocked(service.approvePostingRuleRevision).mockResolvedValue({ id: 91, status: "approved" } as never);
+    vi.mocked(service.reviewJournalProposal).mockResolvedValue({ id: 92, status: "approved", noJournalCreated: true } as never);
+    await expect(caller().accountingControl.overview({ ventureId: 21 })).resolves.toMatchObject({ events: [] });
+    await expect(caller().accountingControl.createPostingRuleRevision({ ventureId: 21, ruleCode: "PROC_RECEIPT", ruleName: "Internal procurement receipt", eventType: "procurement_receipt", effectiveFrom: "2026-08-25", debitAccountMasterId: 10, creditAccountMasterId: 11, changeRationale: "Validation-only controlled mapping" })).resolves.toMatchObject({ id: 91, status: "draft" });
+    await expect(caller().accountingControl.approvePostingRuleRevision({ ventureId: 21, postingRuleRevisionId: 91 })).resolves.toMatchObject({ status: "approved" });
+    await expect(caller().accountingControl.reviewProposal({ ventureId: 21, journalProposalId: 92, decision: "approved", note: "Internal review only; no journal posting." })).resolves.toMatchObject({ noJournalCreated: true });
+    expect(service.createPostingRuleRevision).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, eventType: "procurement_receipt", createdByUserId: 7 }));
+    expect(service.reviewJournalProposal).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, journalProposalId: 92, decision: "approved", actorUserId: 7 }));
   });
   it("allows a finance-authorized actor to request an auditable accounting-period close", async () => {
     vi.mocked(requireVentureRole).mockReset();

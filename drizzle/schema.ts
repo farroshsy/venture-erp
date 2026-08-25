@@ -373,6 +373,78 @@ export const erpJournalLines = mysqlTable("erp_journal_lines", {
   index("erp_journal_line_venture_journal_idx").on(table.ventureId, table.journalId),
 ]);
 
+export const erpAccountingEvents = mysqlTable("erp_accounting_events", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  eventKey: varchar("eventKey", { length: 96 }).notNull(),
+  eventType: varchar("eventType", { length: 96 }).notNull(),
+  sourceDomain: varchar("sourceDomain", { length: 64 }).notNull(),
+  sourceOperationalRecordId: int("sourceOperationalRecordId").notNull().references(() => erpOperationalRecords.id),
+  sourceInventoryMovementId: int("sourceInventoryMovementId").references(() => erpInventoryMovements.id),
+  accountingPeriodId: int("accountingPeriodId").references(() => erpAccountingPeriods.id),
+  accountingDate: varchar("accountingDate", { length: 10 }).notNull(),
+  transactionCurrency: varchar("transactionCurrency", { length: 3 }).notNull(),
+  functionalCurrency: varchar("functionalCurrency", { length: 3 }).notNull(),
+  amount: decimal("amount", { precision: 18, scale: 2 }).notNull(),
+  functionalAmount: decimal("functionalAmount", { precision: 18, scale: 2 }).notNull(),
+  sourceSnapshot: json("sourceSnapshot").notNull(),
+  dimensionsSnapshot: json("dimensionsSnapshot").notNull(),
+  evidenceSnapshot: json("evidenceSnapshot").notNull(),
+  schemaVersion: int("schemaVersion").notNull().default(1),
+  emittedByUserId: int("emittedByUserId").notNull().references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("erp_accounting_event_venture_key_unique").on(table.ventureId, table.eventKey),
+  uniqueIndex("erp_accounting_event_receipt_unique").on(table.ventureId, table.sourceInventoryMovementId, table.eventType),
+  index("erp_accounting_event_venture_type_date_idx").on(table.ventureId, table.eventType, table.accountingDate),
+]);
+
+export const erpPostingRuleRevisions = mysqlTable("erp_posting_rule_revisions", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  ruleCode: varchar("ruleCode", { length: 96 }).notNull(),
+  ruleName: varchar("ruleName", { length: 160 }).notNull(),
+  eventType: varchar("eventType", { length: 96 }).notNull(),
+  revision: int("revision").notNull(),
+  effectiveFrom: varchar("effectiveFrom", { length: 10 }).notNull(),
+  effectiveTo: varchar("effectiveTo", { length: 10 }),
+  status: mysqlEnum("status", ["draft", "reviewed", "approved", "superseded", "retired"]).default("draft").notNull(),
+  lineConfiguration: json("lineConfiguration").notNull(),
+  requiredDimensions: json("requiredDimensions").notNull(),
+  changeRationale: varchar("changeRationale", { length: 255 }).notNull(),
+  adrReference: varchar("adrReference", { length: 96 }),
+  createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+  approvedByUserId: int("approvedByUserId").references(() => users.id),
+  approvedAt: timestamp("approvedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("erp_posting_rule_venture_code_revision_unique").on(table.ventureId, table.ruleCode, table.revision),
+  index("erp_posting_rule_venture_event_status_idx").on(table.ventureId, table.eventType, table.status),
+]);
+
+export const erpJournalProposals = mysqlTable("erp_journal_proposals", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  proposalNumber: varchar("proposalNumber", { length: 96 }).notNull(),
+  accountingEventId: int("accountingEventId").notNull().references(() => erpAccountingEvents.id),
+  postingRuleRevisionId: int("postingRuleRevisionId").references(() => erpPostingRuleRevisions.id),
+  accountingPeriodId: int("accountingPeriodId").references(() => erpAccountingPeriods.id),
+  status: mysqlEnum("status", ["pending_review", "approved", "rejected", "refused"]).default("pending_review").notNull(),
+  currency: varchar("currency", { length: 3 }).notNull(),
+  proposalSnapshot: json("proposalSnapshot").notNull(),
+  refusalReasons: json("refusalReasons").notNull(),
+  reviewedByUserId: int("reviewedByUserId").references(() => users.id),
+  reviewedAt: timestamp("reviewedAt"),
+  reviewNote: varchar("reviewNote", { length: 255 }),
+  createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("erp_journal_proposal_venture_number_unique").on(table.ventureId, table.proposalNumber),
+  uniqueIndex("erp_journal_proposal_event_rule_unique").on(table.accountingEventId, table.postingRuleRevisionId),
+  index("erp_journal_proposal_venture_status_idx").on(table.ventureId, table.status),
+]);
+
 export const erpInventoryBalances = mysqlTable("erp_inventory_balances", {
   id: int("id").autoincrement().primaryKey(),
   ventureId: int("ventureId").notNull().references(() => ventures.id),

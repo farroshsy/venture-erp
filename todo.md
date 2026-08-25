@@ -124,3 +124,6 @@
 - [x] Design immutable tenant-scoped internal accounting-event and finance-owned effective-dated posting-rule schemas that produce balanced journal proposals only, with human approval and no automatic external effect.
 - [x] Draft the finance-owned posting-rule configuration interface for Accounting Event → Posting Rule → Journal Proposal control.
 - [x] Generate an architecture presentation script for the Accounting Event → Posting Rule → Journal Proposal control engine.
+- [x] Implement immutable tenant-scoped internal accounting events and finance-owned effective-dated declarative posting-rule revisions, with no automatic journal posting or external effect.
+- [x] Implement internal procurement-receipt event evaluation into balanced, human-reviewed journal proposals only, with explainability, refusal evidence, and no payroll/tax/payment/external action.
+- [x] Inspect the supplied ERP class project only as reference material and record any reusable conceptual patterns without executing untrusted code or importing its data blindly.

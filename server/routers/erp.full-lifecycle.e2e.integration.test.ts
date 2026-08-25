@@ -112,6 +112,54 @@ describe("typed-route sales lifecycle with real authorization", () => {
     expect(audits.some(event => event.operationalRecordId === mismatchedInvoice!.id && event.eventType === "payable_invoice.three_way_match_evaluated")).toBe(true);
   }, 20_000);
 
+  it("emits an immutable internal procurement-receipt event and generates a finance-reviewed journal proposal without creating a journal", async () => {
+    const operator = callerFor(operatorUserId, operatorOpenId); const admin = callerFor(1, "owner");
+    const suffix = "20260825";
+    const supplierCode = `VALIDATION-E2E-ACCOUNTING-SUPPLIER-${suffix}`;
+    const itemCode = `VALIDATION-E2E-ACCOUNTING-ITEM-${suffix}`;
+    const debitAccountCode = `VALIDATION-E2E-ACCOUNTING-DEBIT-${suffix}`;
+    const creditAccountCode = `VALIDATION-E2E-ACCOUNTING-CREDIT-${suffix}`;
+    const periodCode = `VALIDATION-E2E-ACCOUNTING-PERIOD-${suffix}`;
+    const purchaseOrderNumber = `VALIDATION-E2E-ACCOUNTING-PO-${suffix}`;
+    let masters = await operator.master.list({ ventureId });
+    let supplier = masters.find(master => master.domain === "supplier" && master.code === supplierCode);
+    if (!supplier) supplier = await operator.master.create({ ventureId, domain: "supplier", code: supplierCode, name: "VALIDATION-ONLY accounting-control supplier", attributes: { validationOnly: true, noExternalSupplierAction: true } });
+    let item = masters.find(master => master.domain === "item" && master.code === itemCode);
+    if (!item) item = await operator.master.create({ ventureId, domain: "item", code: itemCode, name: "VALIDATION-ONLY accounting-control item", attributes: { validationOnly: true } });
+    masters = await operator.master.list({ ventureId });
+    let debitAccount = masters.find(master => master.domain === "account" && master.code === debitAccountCode);
+    if (!debitAccount) debitAccount = await operator.master.create({ ventureId, domain: "account", code: debitAccountCode, name: "VALIDATION-ONLY inventory receipt debit", attributes: { validationOnly: true } });
+    let creditAccount = masters.find(master => master.domain === "account" && master.code === creditAccountCode);
+    if (!creditAccount) creditAccount = await operator.master.create({ ventureId, domain: "account", code: creditAccountCode, name: "VALIDATION-ONLY receipt clearing credit", attributes: { validationOnly: true } });
+    let period = (await operator.period.list({ ventureId })).find(item => item.code === periodCode);
+    if (!period) period = await operator.period.create({ ventureId, code: periodCode, name: "VALIDATION-ONLY accounting control period", startDate: "2026-08-01", endDate: "2026-08-31" });
+    const controlBefore = await admin.accountingControl.overview({ ventureId });
+    let rule = controlBefore.rules.find(item => item.ruleCode === "VALIDATION-E2E-PROC-RECEIPT");
+    if (!rule) await admin.accountingControl.createPostingRuleRevision({ ventureId, ruleCode: "VALIDATION-E2E-PROC-RECEIPT", ruleName: "VALIDATION-ONLY procurement receipt proposal", eventType: "procurement_receipt", effectiveFrom: "2026-08-01", debitAccountMasterId: debitAccount.id, creditAccountMasterId: creditAccount.id, changeRationale: "VALIDATION-ONLY internal proposal mapping" });
+    rule = (await admin.accountingControl.overview({ ventureId })).rules.find(item => item.ruleCode === "VALIDATION-E2E-PROC-RECEIPT")!;
+    if (rule.status !== "approved") await admin.accountingControl.approvePostingRuleRevision({ ventureId, postingRuleRevisionId: rule.id });
+    let purchaseOrder = (await operator.records.list({ ventureId })).find(record => record.recordNumber === purchaseOrderNumber);
+    if (!purchaseOrder) purchaseOrder = await operator.records.create({ ventureId, domain: "procurement", recordType: "purchase_order", recordNumber: purchaseOrderNumber, title: "VALIDATION-ONLY accounting-control purchase order", counterpartyMasterId: supplier.id, accountingPeriodId: period.id, amount: 125, effectiveDate: "2026-08-25", data: { validationOnly: true, noSupplierPayment: true, noExternalProcurementAction: true } });
+    if (purchaseOrder.status === "draft") await operator.records.transition({ ventureId, operationalRecordId: purchaseOrder.id, targetStatus: "pending_approval", note: "VALIDATION-ONLY accounting-control approval request" });
+    purchaseOrder = (await operator.records.list({ ventureId })).find(record => record.id === purchaseOrder!.id)!;
+    if (purchaseOrder.status === "pending_approval") await operator.records.transition({ ventureId, operationalRecordId: purchaseOrder.id, targetStatus: "approved", note: "VALIDATION-ONLY accounting-control approved purchase order" });
+    const receiptExists = (await operator.inventory.movements({ ventureId, itemMasterId: item.id })).some(movement => movement.operationalRecordId === purchaseOrder!.id && movement.movementType === "receipt");
+    const journalCountBefore = (await admin.journal.list({ ventureId })).length;
+    if (!receiptExists) await operator.inventory.receivePurchaseOrder({ ventureId, purchaseOrderRecordId: purchaseOrder.id, itemMasterId: item.id, quantity: 1, narrative: "VALIDATION-ONLY accounting-control final receipt", finalReceipt: true });
+    const controlAfterReceipt = await admin.accountingControl.overview({ ventureId });
+    const event = controlAfterReceipt.events.find(item => item.sourceOperationalRecordId === purchaseOrder!.id)!;
+    let proposal = controlAfterReceipt.proposals.find(item => item.accountingEventId === event.id && item.postingRuleRevisionId === rule!.id);
+    if (!proposal) await admin.accountingControl.evaluateEvent({ ventureId, accountingEventId: event.id });
+    proposal = (await admin.accountingControl.overview({ ventureId })).proposals.find(item => item.accountingEventId === event.id && item.postingRuleRevisionId === rule!.id)!;
+    expect(["pending_review", "approved"]).toContain(proposal.status);
+    expect(proposal.proposalSnapshot).toMatchObject({ accountingEventId: event.id, ruleCode: "VALIDATION-E2E-PROC-RECEIPT", noJournalCreated: true, noAutomaticPosting: true, noExternalEffect: true, lines: expect.arrayContaining([expect.objectContaining({ entrySide: "debit", amount: 125 }), expect.objectContaining({ entrySide: "credit", amount: 125 })]) });
+    if (proposal.status === "pending_review") await admin.accountingControl.reviewProposal({ ventureId, journalProposalId: proposal.id, decision: "approved", note: "VALIDATION-ONLY finance review; retain as proposal only." });
+    expect((await admin.journal.list({ ventureId })).length).toBe(journalCountBefore);
+    const audits = await admin.audit({ ventureId });
+    expect(audits.some(item => item.eventType === "accounting_event.procurement_receipt_emitted" && item.operationalRecordId === purchaseOrder!.id)).toBe(true);
+    expect(audits.some(item => item.eventType === "journal_proposal.approved" && (item.payload as { noJournalCreated?: boolean }).noJournalCreated === true)).toBe(true);
+  }, 20_000);
+
   it("retains a supplier invoice reference once per active supplier and venture, rejects a duplicate, and records only internal evidence", async () => {
     const operator = callerFor(operatorUserId, operatorOpenId); const admin = callerFor(1, "owner");
     const supplierCode = "VALIDATION-E2E-SUPPLIER-REFERENCE-SUPPLIER-20260825";
