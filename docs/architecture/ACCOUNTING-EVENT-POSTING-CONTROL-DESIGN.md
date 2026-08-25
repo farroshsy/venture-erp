@@ -14,6 +14,12 @@ Migration `0018_awesome_naoko.sql` adds tenant-scoped finance-dimension definiti
 
 Each definition and value is unique in its active venture, carries a draft/active/retired lifecycle, and creates internal audit evidence with explicit no-automatic-posting and no-external-effect flags. Required-dimension enforcement and selector binding remain future governed increments after finance policy is configured.
 
+## 0.2 Frozen proposal-dimension snapshots
+
+When the engine evaluates an event, it reads the active finance-dimension definitions for the same venture and freezes a catalog snapshot into the proposal. Every generated line receives the same immutable context: tenant, source event, source document snapshot, source dimensions, evidence references, posting-rule code/revision, effective date, period, currency, and the active finance-dimension catalog with retained source values. A later rename, retirement, value change, or catalog restructure cannot alter the persisted proposal snapshot.
+
+An active definition marked `requiredForProposal` is a guard, not a defaulting mechanism. If its code has no retained source value on the accounting event, evaluation produces durable refusal evidence rather than inferring a value, selecting the first active value, or creating a journal. Existing snapshots remain immutable; this increment does not retroactively alter them.
+
 ## 1. Purpose and boundary
 
 This design adds a controlled seam between an operational fact and a finance-reviewed journal. A source module emits an **immutable internal accounting event**. A finance-owned, effective-dated posting-rule revision may evaluate that event into a **balanced journal proposal**. The proposal is separate from the authoritative journal and cannot post itself. Existing finance authorization, period controls, balanced-journal validation, and audit evidence remain the only path to a posted journal.

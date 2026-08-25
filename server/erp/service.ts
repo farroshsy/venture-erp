@@ -530,13 +530,18 @@ export async function evaluateAccountingEventToProposal(input: { ventureId: numb
   const db = await requireDb();
   const [event] = await db.select().from(erpAccountingEvents).where(and(eq(erpAccountingEvents.id, input.accountingEventId), eq(erpAccountingEvents.ventureId, input.ventureId))).limit(1);
   if (!event) throw new Error("Accounting event not found in the active venture.");
+  const activeDimensions = await db.select().from(erpFinanceDimensionDefinitions).where(and(eq(erpFinanceDimensionDefinitions.ventureId, input.ventureId), eq(erpFinanceDimensionDefinitions.status, "active")));
+  const sourceDimensions = event.dimensionsSnapshot as Record<string, unknown>;
+  const financeDimensionSnapshot = activeDimensions.map(definition => ({ definitionId: definition.id, code: definition.code, name: definition.name, requiredForProposal: definition.requiredForProposal, sourceValue: sourceDimensions[definition.code] ?? null }));
+  const missingRequiredDimensions = financeDimensionSnapshot.filter(dimension => dimension.requiredForProposal && (dimension.sourceValue === null || dimension.sourceValue === undefined)).map(dimension => `Required finance dimension ${dimension.code} has no retained source value.`);
   const candidates = (await db.select().from(erpPostingRuleRevisions).where(and(eq(erpPostingRuleRevisions.ventureId, input.ventureId), eq(erpPostingRuleRevisions.eventType, event.eventType), eq(erpPostingRuleRevisions.status, "approved")))).filter(rule => rule.effectiveFrom <= event.accountingDate && (rule.effectiveTo === null || rule.effectiveTo >= event.accountingDate));
-  if (candidates.length !== 1) {
+  if (candidates.length !== 1 || missingRequiredDimensions.length) {
     const proposalNumber = `JP-REF-${event.id}`;
     const [existing] = await db.select().from(erpJournalProposals).where(and(eq(erpJournalProposals.ventureId, input.ventureId), eq(erpJournalProposals.proposalNumber, proposalNumber))).limit(1);
     if (existing) return existing;
-    const reasons = candidates.length === 0 ? ["No approved effective-dated posting rule matches this accounting event."] : ["More than one approved effective-dated posting rule matches this accounting event."];
-    const result = await db.insert(erpJournalProposals).values({ ventureId: input.ventureId, proposalNumber, accountingEventId: event.id, accountingPeriodId: event.accountingPeriodId, status: "refused", currency: event.functionalCurrency, proposalSnapshot: { accountingEventId: event.id, eventKey: event.eventKey, noJournalCreated: true }, refusalReasons: reasons, createdByUserId: input.actorUserId });
+    const ruleReasons = candidates.length === 0 ? ["No approved effective-dated posting rule matches this accounting event."] : candidates.length > 1 ? ["More than one approved effective-dated posting rule matches this accounting event."] : [];
+    const reasons = [...ruleReasons, ...missingRequiredDimensions];
+    const result = await db.insert(erpJournalProposals).values({ ventureId: input.ventureId, proposalNumber, accountingEventId: event.id, accountingPeriodId: event.accountingPeriodId, status: "refused", currency: event.functionalCurrency, proposalSnapshot: { accountingEventId: event.id, eventKey: event.eventKey, frozenFinanceDimensions: financeDimensionSnapshot, noJournalCreated: true }, refusalReasons: reasons, createdByUserId: input.actorUserId });
     const id = Number(result[0].insertId);
     await createAuditEvent({ ventureId: input.ventureId, domain: "finance", operationalRecordId: event.sourceOperationalRecordId, eventType: "journal_proposal.refused", actorUserId: input.actorUserId, payload: { journalProposalId: id, accountingEventId: event.id, reasons, noAutomaticJournalPosting: true, noExternalEffect: true } });
     return { id, status: "refused" as const, refusalReasons: reasons };
@@ -546,11 +551,12 @@ export async function evaluateAccountingEventToProposal(input: { ventureId: numb
   if (existing) return existing;
   if (!event.accountingPeriodId) throw new Error("Procurement receipt accounting events require an accounting period before a proposal can be generated.");
   await requirePeriod(db, input.ventureId, event.accountingPeriodId);
-  const lines = asPostingRuleLines(rule.lineConfiguration).map(line => ({ ...line, amount: normalizeMoney(Number(event.functionalAmount)) }));
+  const frozenContext = { tenant: input.ventureId, accountingEventId: event.id, sourceDocument: event.sourceSnapshot, sourceDimensions: event.dimensionsSnapshot, evidenceReferences: event.evidenceSnapshot, postingRuleRevisionId: rule.id, ruleCode: rule.ruleCode, ruleRevision: rule.revision, effectiveDate: event.accountingDate, accountingPeriodId: event.accountingPeriodId, currency: event.functionalCurrency, financeDimensions: financeDimensionSnapshot };
+  const lines = asPostingRuleLines(rule.lineConfiguration).map(line => ({ ...line, amount: normalizeMoney(Number(event.functionalAmount)), frozenDimensions: frozenContext }));
   for (const line of lines) await requireAccountMaster(db, input.ventureId, line.accountMasterId);
   validateBalancedJournal(lines);
   const proposalNumber = `JP-${event.id}-R${rule.revision}`;
-  const result = await db.insert(erpJournalProposals).values({ ventureId: input.ventureId, proposalNumber, accountingEventId: event.id, postingRuleRevisionId: rule.id, accountingPeriodId: event.accountingPeriodId, status: "pending_review", currency: event.functionalCurrency, proposalSnapshot: { accountingEventId: event.id, eventKey: event.eventKey, sourceOperationalRecordId: event.sourceOperationalRecordId, sourceInventoryMovementId: event.sourceInventoryMovementId, postingRuleRevisionId: rule.id, ruleCode: rule.ruleCode, ruleRevision: rule.revision, functionalAmount: event.functionalAmount, dimensions: event.dimensionsSnapshot, lines, noJournalCreated: true, noAutomaticPosting: true, noExternalEffect: true }, refusalReasons: [], createdByUserId: input.actorUserId });
+  const result = await db.insert(erpJournalProposals).values({ ventureId: input.ventureId, proposalNumber, accountingEventId: event.id, postingRuleRevisionId: rule.id, accountingPeriodId: event.accountingPeriodId, status: "pending_review", currency: event.functionalCurrency, proposalSnapshot: { accountingEventId: event.id, eventKey: event.eventKey, sourceOperationalRecordId: event.sourceOperationalRecordId, sourceInventoryMovementId: event.sourceInventoryMovementId, postingRuleRevisionId: rule.id, ruleCode: rule.ruleCode, ruleRevision: rule.revision, functionalAmount: event.functionalAmount, dimensions: event.dimensionsSnapshot, frozenContext, lines, noJournalCreated: true, noAutomaticPosting: true, noExternalEffect: true }, refusalReasons: [], createdByUserId: input.actorUserId });
   const id = Number(result[0].insertId);
   await createAuditEvent({ ventureId: input.ventureId, domain: "finance", operationalRecordId: event.sourceOperationalRecordId, eventType: "journal_proposal.generated", actorUserId: input.actorUserId, payload: { journalProposalId: id, accountingEventId: event.id, postingRuleRevisionId: rule.id, noJournalCreated: true, noAutomaticPosting: true, noExternalEffect: true } });
   return { id, proposalNumber, status: "pending_review" as const, lines };
