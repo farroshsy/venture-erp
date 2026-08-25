@@ -251,6 +251,16 @@ export async function evaluatePayableInvoiceThreeWayMatch(input: { ventureId: nu
   return { payableInvoiceRecordId: invoice.id, ...match };
 }
 
+export async function approveMatchedPayableInvoice(input: { ventureId: number; payableInvoiceRecordId: number; actorUserId: number; note?: string }) {
+  const db = await requireDb();
+  const [invoice] = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.id, input.payableInvoiceRecordId), eq(erpOperationalRecords.ventureId, input.ventureId))).limit(1);
+  if (!invoice || invoice.recordType !== "payable_invoice" || invoice.domain !== "procurement") throw new Error("Payable invoice not found in the active venture.");
+  if (invoice.status !== "pending_approval") throw new Error("Only a pending-approval payable invoice may be approved through the internal three-way-match control.");
+  const match = (invoice.data as { threeWayMatch?: PayableThreeWayMatch }).threeWayMatch;
+  if (!match || match.status !== "matched") throw new Error("Payable invoice approval requires a successful internal three-way match.");
+  return transitionOperationalRecord({ ventureId: input.ventureId, operationalRecordId: invoice.id, targetStatus: "approved", actorUserId: input.actorUserId, note: input.note ?? "Approved after successful internal three-way match; no payment or external action." });
+}
+
 export async function createInternalPaymentRecord(input: { ventureId: number; recordNumber: string; title: string; invoiceRecordId: number; amount: number; effectiveDate: string; data: Record<string, unknown>; createdByUserId: number }) {
   const db = await requireDb();
   const rows = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.id, input.invoiceRecordId), eq(erpOperationalRecords.ventureId, input.ventureId))).limit(1);

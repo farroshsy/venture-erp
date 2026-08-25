@@ -33,6 +33,7 @@ vi.mock("../erp/service", () => ({
   listInvoiceSettlements: vi.fn(),
   createInvoiceRecord: vi.fn(),
   evaluatePayableInvoiceThreeWayMatch: vi.fn(),
+  approveMatchedPayableInvoice: vi.fn(),
   createInternalPaymentRecord: vi.fn(),
   listWorkflowDefinitions: vi.fn(),
   createWorkflowDefinition: vi.fn(),
@@ -213,6 +214,13 @@ describe("operational ERP router", () => {
     vi.mocked(service.evaluatePayableInvoiceThreeWayMatch).mockResolvedValue({ payableInvoiceRecordId: 72, status: "matched", receiptCount: 1, noPaymentExecution: true } as never);
     await expect(caller().invoice.evaluateThreeWayMatch({ ventureId: 21, payableInvoiceRecordId: 72, purchaseOrderRecordId: 73 })).resolves.toMatchObject({ status: "matched", noPaymentExecution: true });
     expect(service.evaluatePayableInvoiceThreeWayMatch).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, payableInvoiceRecordId: 72, purchaseOrderRecordId: 73, actorUserId: 7 }));
+  });
+  it("forwards matched-only payable approval through a finance-authorized tenant route", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.approveMatchedPayableInvoice).mockResolvedValue({ id: 72, from: "pending_approval", to: "approved" } as never);
+    await expect(caller().invoice.approveMatchedPayable({ ventureId: 21, payableInvoiceRecordId: 72, note: "Matched internal evidence reviewed" })).resolves.toMatchObject({ to: "approved" });
+    expect(service.approveMatchedPayableInvoice).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, payableInvoiceRecordId: 72, actorUserId: 7, note: "Matched internal evidence reviewed" }));
   });
   it("forwards a selected public-budget jurisdiction pack only through a finance-authorized venture route", async () => {
     vi.mocked(requireVentureRole).mockReset();
