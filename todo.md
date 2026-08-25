@@ -111,3 +111,4 @@
 - [x] Add real typed-route integration evidence for project, task, asset, and maintenance lifecycles with operator proposal, approver-gated activation, tenant isolation, and audit assertions.
 - [x] Add explicit jurisdiction-neutral calculation-input fields and contracts to dedicated project/task, asset/maintenance, service-request, and CRM-opportunity records, with validation, UI capture, persistence, audit evidence, and focused typed-route proof.
 - [x] Incorporate the user-supplied Indonesian payroll/tax review-status wording and official DJP Article 21/26 technical source into the draft evidence pack without changing its unreviewed, inactive, or non-calculating boundary.
+- [x] Add the user-supplied source-placeholder note and structured pending-approval status to the Indonesian payroll draft evidence pack, retaining only qualified-reviewer-authorized paths to payroll use.
