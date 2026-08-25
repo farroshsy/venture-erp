@@ -20,6 +20,12 @@ When the engine evaluates an event, it reads the active finance-dimension defini
 
 An active definition marked `requiredForProposal` is a guard, not a defaulting mechanism. If its code has no retained source value on the accounting event, evaluation produces durable refusal evidence rather than inferring a value, selecting the first active value, or creating a journal. Existing snapshots remain immutable; this increment does not retroactively alter them.
 
+## 0.3 Bounded deterministic allocations
+
+The initial proposal engine now supports one or more debit percentage allocations and one balancing credit, expressed in integer basis points. Debit percentages and the credit percentage must each total exactly 10,000 basis points. The evaluator calculates to two decimal places, applies any rounding residual deterministically to the final debit allocation, and persists the percentage, total cents, residual treatment, and frozen context on every proposal line. Existing one-debit/one-credit rule snapshots without an explicit percentage remain compatible as 100.00% mappings.
+
+This is intentionally not a valuation, landed-cost, weight, volume, driver, cost-pool, fixed-amount, quantity, or labor/machine-hour allocation engine. Those allocation types require separate finance policy, source-data contracts, and controlled tests before adoption. No allocation creates or posts a journal, changes balances, calculates tax/payroll, issues a payment, files, or transmits externally.
+
 ## 1. Purpose and boundary
 
 This design adds a controlled seam between an operational fact and a finance-reviewed journal. A source module emits an **immutable internal accounting event**. A finance-owned, effective-dated posting-rule revision may evaluate that event into a **balanced journal proposal**. The proposal is separate from the authoritative journal and cannot post itself. Existing finance authorization, period controls, balanced-journal validation, and audit evidence remain the only path to a posted journal.

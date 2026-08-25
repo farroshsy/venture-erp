@@ -38,7 +38,7 @@ import { availableBudget, calculateTax, canTransition, convertCurrency, normaliz
 
 export type MasterDomain = "customer" | "supplier" | "item" | "employee" | "account" | "project" | "asset" | "location" | "compensation_component" | "tax_category";
 export type OperationalDomain = "finance" | "sales" | "procurement" | "inventory" | "people" | "payroll" | "projects" | "assets" | "service" | "crm";
-export type PostingRuleLine = { entrySide: "debit" | "credit"; accountMasterId: number; narrative: string };
+export type PostingRuleLine = { entrySide: "debit" | "credit"; accountMasterId: number; narrative: string; allocationBasisPoints?: number };
 
 async function requireDb() {
   const db = await getDb();
@@ -47,13 +47,19 @@ async function requireDb() {
 }
 
 function asPostingRuleLines(value: unknown): PostingRuleLine[] {
-  if (!Array.isArray(value) || value.length !== 2) throw new Error("Posting rules require exactly one debit and one credit line in the initial controlled vocabulary.");
-  const lines = value as PostingRuleLine[];
-  if (lines.filter(line => line.entrySide === "debit").length !== 1 || lines.filter(line => line.entrySide === "credit").length !== 1) throw new Error("Posting rules require exactly one debit and one credit line.");
+  if (!Array.isArray(value) || value.length < 2) throw new Error("Posting rules require at least one debit and one credit line.");
+  const rawLines = value as PostingRuleLine[];
+  const debitCount = rawLines.filter(line => line.entrySide === "debit").length;
+  const creditCount = rawLines.filter(line => line.entrySide === "credit").length;
+  const lines = rawLines.map(line => ({ ...line, allocationBasisPoints: line.allocationBasisPoints ?? (line.entrySide === "credit" || debitCount === 1 ? 10_000 : undefined) }));
+  if (!lines.some(line => line.entrySide === "debit") || lines.filter(line => line.entrySide === "credit").length !== 1) throw new Error("Posting rules require one or more debit lines and exactly one credit line.");
   for (const line of lines) {
-    if (!Number.isInteger(line.accountMasterId) || line.accountMasterId <= 0 || !line.narrative?.trim()) throw new Error("Posting-rule lines require an active account and narrative.");
+    if (!Number.isInteger(line.accountMasterId) || line.accountMasterId <= 0 || !line.narrative?.trim() || !Number.isInteger(line.allocationBasisPoints) || (line.allocationBasisPoints ?? 0) <= 0) throw new Error("Posting-rule lines require an active account, narrative, and positive deterministic allocation.");
   }
-  return lines.map(line => ({ entrySide: line.entrySide, accountMasterId: line.accountMasterId, narrative: line.narrative.trim() }));
+  const debitBasisPoints = lines.filter(line => line.entrySide === "debit").reduce((sum, line) => sum + (line.allocationBasisPoints ?? 0), 0);
+  const creditBasisPoints = lines.filter(line => line.entrySide === "credit").reduce((sum, line) => sum + (line.allocationBasisPoints ?? 0), 0);
+  if (debitBasisPoints !== 10_000 || creditBasisPoints !== 10_000) throw new Error("Deterministic allocation percentages must total exactly 100.00% on both debit and credit sides.");
+  return lines.map(line => ({ entrySide: line.entrySide, accountMasterId: line.accountMasterId, narrative: line.narrative.trim(), allocationBasisPoints: line.allocationBasisPoints }));
 }
 
 async function requireAccountMaster(db: Awaited<ReturnType<typeof requireDb>>, ventureId: number, accountMasterId: number) {
@@ -474,7 +480,7 @@ export async function postJournal(input: { ventureId: number; journalId: number;
   return { id: journal.id, status: "posted" as const };
 }
 
-export async function createPostingRuleRevision(input: { ventureId: number; ruleCode: string; ruleName: string; eventType: "procurement_receipt"; effectiveFrom: string; effectiveTo?: string; debitAccountMasterId: number; creditAccountMasterId: number; changeRationale: string; adrReference?: string; createdByUserId: number }) {
+export async function createPostingRuleRevision(input: { ventureId: number; ruleCode: string; ruleName: string; eventType: "procurement_receipt"; effectiveFrom: string; effectiveTo?: string; debitAccountMasterId: number; creditAccountMasterId: number; debitAllocations?: Array<{ accountMasterId: number; allocationBasisPoints: number; narrative: string }>; changeRationale: string; adrReference?: string; createdByUserId: number }) {
   if (!input.ruleCode.trim() || !input.ruleName.trim() || !input.changeRationale.trim()) throw new Error("Posting-rule code, name, and rationale are required.");
   if (input.effectiveTo && input.effectiveTo < input.effectiveFrom) throw new Error("Posting-rule effective end date cannot precede its effective start date.");
   const db = await requireDb();
@@ -483,9 +489,11 @@ export async function createPostingRuleRevision(input: { ventureId: number; rule
   if (input.debitAccountMasterId === input.creditAccountMasterId) throw new Error("Posting-rule debit and credit accounts must be distinct.");
   const existing = await db.select().from(erpPostingRuleRevisions).where(and(eq(erpPostingRuleRevisions.ventureId, input.ventureId), eq(erpPostingRuleRevisions.ruleCode, input.ruleCode.trim()))).orderBy(desc(erpPostingRuleRevisions.revision));
   const revision = (existing[0]?.revision ?? 0) + 1;
+  const debitAllocations = input.debitAllocations?.length ? input.debitAllocations : [{ accountMasterId: input.debitAccountMasterId, allocationBasisPoints: 10_000, narrative: "Internal procurement receipt — inventory/receipt clearing debit" }];
+  for (const allocation of debitAllocations) await requireAccountMaster(db, input.ventureId, allocation.accountMasterId);
   const lineConfiguration = asPostingRuleLines([
-    { entrySide: "debit", accountMasterId: input.debitAccountMasterId, narrative: "Internal procurement receipt — inventory/receipt clearing debit" },
-    { entrySide: "credit", accountMasterId: input.creditAccountMasterId, narrative: "Internal procurement receipt — inventory/receipt clearing credit" },
+    ...debitAllocations.map(line => ({ entrySide: "debit" as const, accountMasterId: line.accountMasterId, narrative: line.narrative, allocationBasisPoints: line.allocationBasisPoints })),
+    { entrySide: "credit", accountMasterId: input.creditAccountMasterId, narrative: "Internal procurement receipt — inventory/receipt clearing credit", allocationBasisPoints: 10_000 },
   ]);
   const result = await db.insert(erpPostingRuleRevisions).values({ ventureId: input.ventureId, ruleCode: input.ruleCode.trim(), ruleName: input.ruleName.trim(), eventType: input.eventType, revision, effectiveFrom: input.effectiveFrom, effectiveTo: input.effectiveTo, status: "draft", lineConfiguration, requiredDimensions: ["sourceOperationalRecordId", "sourceInventoryMovementId", "itemMasterId", "supplierMasterId"], changeRationale: input.changeRationale.trim(), adrReference: input.adrReference?.trim() || null, createdByUserId: input.createdByUserId });
   const id = Number(result[0].insertId);
@@ -552,7 +560,16 @@ export async function evaluateAccountingEventToProposal(input: { ventureId: numb
   if (!event.accountingPeriodId) throw new Error("Procurement receipt accounting events require an accounting period before a proposal can be generated.");
   await requirePeriod(db, input.ventureId, event.accountingPeriodId);
   const frozenContext = { tenant: input.ventureId, accountingEventId: event.id, sourceDocument: event.sourceSnapshot, sourceDimensions: event.dimensionsSnapshot, evidenceReferences: event.evidenceSnapshot, postingRuleRevisionId: rule.id, ruleCode: rule.ruleCode, ruleRevision: rule.revision, effectiveDate: event.accountingDate, accountingPeriodId: event.accountingPeriodId, currency: event.functionalCurrency, financeDimensions: financeDimensionSnapshot };
-  const lines = asPostingRuleLines(rule.lineConfiguration).map(line => ({ ...line, amount: normalizeMoney(Number(event.functionalAmount)), frozenDimensions: frozenContext }));
+  const configuredLines = asPostingRuleLines(rule.lineConfiguration);
+  const totalCents = Math.round(Number(event.functionalAmount) * 100);
+  let allocatedDebitCents = 0;
+  const debitLines = configuredLines.filter(line => line.entrySide === "debit");
+  const lines = configuredLines.map(line => {
+    const isFinalDebit = line.entrySide === "debit" && line === debitLines[debitLines.length - 1];
+    const amountCents = line.entrySide === "credit" ? totalCents : isFinalDebit ? totalCents - allocatedDebitCents : Math.floor(totalCents * (line.allocationBasisPoints ?? 0) / 10_000);
+    if (line.entrySide === "debit") allocatedDebitCents += amountCents;
+    return { ...line, amount: normalizeMoney(amountCents / 100), derivation: { method: "percentage_allocation", allocationBasisPoints: line.allocationBasisPoints, totalCents, residualApplied: isFinalDebit ? totalCents - allocatedDebitCents + amountCents : 0 }, frozenDimensions: frozenContext };
+  });
   for (const line of lines) await requireAccountMaster(db, input.ventureId, line.accountMasterId);
   validateBalancedJournal(lines);
   const proposalNumber = `JP-${event.id}-R${rule.revision}`;
