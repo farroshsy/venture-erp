@@ -178,12 +178,77 @@ export async function setVentureReportingCurrency(input: { ventureId: number; re
 
 export type InvoiceType = "receivable_invoice" | "payable_invoice";
 
+type PayableThreeWayMatch = {
+  status: "matched" | "mismatch";
+  purchaseOrderRecordId: number;
+  purchaseOrderRecordNumber: string;
+  purchaseOrderTotalAmount: number;
+  invoiceTotalAmount: number;
+  purchaseOrderCurrency: string;
+  invoiceCurrency: string;
+  receiptCount: number;
+  receivedQuantity: number;
+  supplierMatched: boolean;
+  currencyMatched: boolean;
+  amountWithinPurchaseOrder: boolean;
+  reasonCodes: string[];
+  evaluatedAt: string;
+  evaluatedByUserId: number;
+  internalEvidenceOnly: true;
+  noPaymentExecution: true;
+  noExternalSupplierAction: true;
+};
+
 export async function createInvoiceRecord(input: { ventureId: number; invoiceType: InvoiceType; recordNumber: string; title: string; counterpartyMasterId: number; accountingPeriodId?: number; taxPolicyId?: number; amount: number; effectiveDate: string; dueDate?: string; data: Record<string, unknown>; createdByUserId: number }) {
   const db = await requireDb();
   const counterparty = await requireMaster(db, input.ventureId, input.counterpartyMasterId);
   const expectedDomain = input.invoiceType === "receivable_invoice" ? "customer" : "supplier";
   if (counterparty.domain !== expectedDomain) throw new Error(`${input.invoiceType === "receivable_invoice" ? "Receivable" : "Payable"} invoices require an active ${expectedDomain} master record.`);
   return createOperationalRecord({ ventureId: input.ventureId, domain: input.invoiceType === "receivable_invoice" ? "sales" : "procurement", recordType: input.invoiceType, recordNumber: input.recordNumber, title: input.title, counterpartyMasterId: input.counterpartyMasterId, accountingPeriodId: input.accountingPeriodId, taxPolicyId: input.taxPolicyId, amount: input.amount, effectiveDate: input.effectiveDate, dueDate: input.dueDate, data: { ...input.data, invoiceType: input.invoiceType, noExternalCollectionOrDisbursement: true }, createdByUserId: input.createdByUserId });
+}
+
+export async function evaluatePayableInvoiceThreeWayMatch(input: { ventureId: number; payableInvoiceRecordId: number; purchaseOrderRecordId: number; actorUserId: number }) {
+  const db = await requireDb();
+  const [invoice] = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.id, input.payableInvoiceRecordId), eq(erpOperationalRecords.ventureId, input.ventureId))).limit(1);
+  if (!invoice || invoice.recordType !== "payable_invoice" || invoice.domain !== "procurement") throw new Error("Payable invoice not found in the active venture.");
+  if (!["draft", "pending_approval"].includes(invoice.status)) throw new Error("Only draft or pending-approval payable invoices may be evaluated for an internal three-way match.");
+  const [purchaseOrder] = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.id, input.purchaseOrderRecordId), eq(erpOperationalRecords.ventureId, input.ventureId))).limit(1);
+  if (!purchaseOrder || purchaseOrder.recordType !== "purchase_order" || purchaseOrder.domain !== "procurement") throw new Error("Purchase order not found in the active venture.");
+  if (!["approved", "posted", "fulfilled"].includes(purchaseOrder.status)) throw new Error("Purchase order must be approved, posted, or fulfilled before an internal three-way match.");
+  const receipts = await db.select().from(erpInventoryMovements).where(and(eq(erpInventoryMovements.ventureId, input.ventureId), eq(erpInventoryMovements.operationalRecordId, purchaseOrder.id), eq(erpInventoryMovements.movementType, "receipt")));
+  const receivedQuantity = normalizeMoney(receipts.reduce((total, receipt) => total + Number(receipt.quantity), 0));
+  const supplierMatched = invoice.counterpartyMasterId === purchaseOrder.counterpartyMasterId;
+  const currencyMatched = invoice.transactionCurrency === purchaseOrder.transactionCurrency;
+  const amountWithinPurchaseOrder = Number(invoice.totalAmount) <= Number(purchaseOrder.totalAmount);
+  const reasonCodes = [
+    ...(supplierMatched ? [] : ["supplier_mismatch"]),
+    ...(currencyMatched ? [] : ["currency_mismatch"]),
+    ...(amountWithinPurchaseOrder ? [] : ["invoice_exceeds_purchase_order"]),
+    ...(receipts.length > 0 && receivedQuantity > 0 ? [] : ["missing_receipt_evidence"]),
+  ];
+  const match: PayableThreeWayMatch = {
+    status: reasonCodes.length === 0 ? "matched" : "mismatch",
+    purchaseOrderRecordId: purchaseOrder.id,
+    purchaseOrderRecordNumber: purchaseOrder.recordNumber,
+    purchaseOrderTotalAmount: normalizeMoney(Number(purchaseOrder.totalAmount)),
+    invoiceTotalAmount: normalizeMoney(Number(invoice.totalAmount)),
+    purchaseOrderCurrency: purchaseOrder.transactionCurrency,
+    invoiceCurrency: invoice.transactionCurrency,
+    receiptCount: receipts.length,
+    receivedQuantity,
+    supplierMatched,
+    currencyMatched,
+    amountWithinPurchaseOrder,
+    reasonCodes,
+    evaluatedAt: new Date().toISOString(),
+    evaluatedByUserId: input.actorUserId,
+    internalEvidenceOnly: true,
+    noPaymentExecution: true,
+    noExternalSupplierAction: true,
+  };
+  await db.update(erpOperationalRecords).set({ data: { ...(invoice.data as Record<string, unknown>), threeWayMatch: match } }).where(eq(erpOperationalRecords.id, invoice.id));
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", operationalRecordId: invoice.id, eventType: "payable_invoice.three_way_match_evaluated", actorUserId: input.actorUserId, payload: match });
+  return { payableInvoiceRecordId: invoice.id, ...match };
 }
 
 export async function createInternalPaymentRecord(input: { ventureId: number; recordNumber: string; title: string; invoiceRecordId: number; amount: number; effectiveDate: string; data: Record<string, unknown>; createdByUserId: number }) {
@@ -230,6 +295,10 @@ export async function transitionOperationalRecord(input: { ventureId: number; op
   const record = rows[0];
   if (!record) throw new Error("Operational record not found in the active venture.");
   if (!canTransition(record.status, input.targetStatus)) throw new Error(`Cannot transition ${record.status} to ${input.targetStatus}.`);
+  if (record.recordType === "payable_invoice" && input.targetStatus === "approved") {
+    const match = (record.data as { threeWayMatch?: PayableThreeWayMatch }).threeWayMatch;
+    if (!match || match.status !== "matched") throw new Error("Payable invoice approval requires a successful internal three-way match against an approved purchase order and recorded receipt evidence.");
+  }
   if (record.recordType === "payment_record" && input.targetStatus === "posted") {
     const invoiceRecordId = Number((record.data as { invoiceRecordId?: unknown }).invoiceRecordId);
     if (!Number.isInteger(invoiceRecordId) || invoiceRecordId <= 0) throw new Error("Payment record is missing its invoice reference.");

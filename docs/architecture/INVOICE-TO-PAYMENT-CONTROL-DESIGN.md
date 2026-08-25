@@ -18,7 +18,11 @@ Venture ERP treats invoices and payment records as **internal accounting and ope
 
 The server validates that invoice counterparties belong to the active venture and match their expected master domain. Payment records must reference an existing invoice in the same venture, must not exceed its internal open balance, and cannot be created against an unpaid invoice outside the defined invoice types. The service records an immutable audit event and adjusts an internal settlement accumulator only after the payment record passes its controlled lifecycle.
 
+For a payable invoice, approval now additionally requires a successful **internal three-way match**. A finance-authorized reviewer compares the venture-scoped payable invoice to an approved, posted, or fulfilled purchase order and its recorded inventory receipt evidence. The control verifies supplier identity, transaction currency, invoice total against the purchase-order total, and the presence of at least one positive receipt quantity. It persists either a `matched` or `mismatch` evidence object on the payable invoice and writes `payable_invoice.three_way_match_evaluated` audit evidence. A mismatch is durable evidence, not a bypass: the generic approval transition refuses a payable invoice until the stored match status is `matched`.
+
 > A posted internal payment record is **evidence of a controlled accounting event**, not proof that a bank, processor, or government authority accepted or executed a transaction.
+
+> A matched payable invoice is **approval eligibility evidence only**. It is not a payment instruction, bank-transfer request, supplier communication, tax determination, tax filing, or confirmation that goods or services were accepted outside the retained internal receipt record.
 
 ## Deferred integration boundary
 

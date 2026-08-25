@@ -32,6 +32,7 @@ vi.mock("../erp/service", () => ({
   fulfillSalesOrderInventory: vi.fn(),
   listInvoiceSettlements: vi.fn(),
   createInvoiceRecord: vi.fn(),
+  evaluatePayableInvoiceThreeWayMatch: vi.fn(),
   createInternalPaymentRecord: vi.fn(),
   listWorkflowDefinitions: vi.fn(),
   createWorkflowDefinition: vi.fn(),
@@ -205,6 +206,13 @@ describe("operational ERP router", () => {
     await expect(caller().invoice.createPaymentRecord({ ventureId: 21, recordNumber: "PAY-001", title: "Internal payment evidence", invoiceRecordId: 62, amount: 100, effectiveDate: "2026-08-24", data: {} })).resolves.toMatchObject({ id: 63 });
     expect(service.createInvoiceRecord).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, invoiceType: "receivable_invoice", counterpartyMasterId: 12, createdByUserId: 7 }));
     expect(service.createInternalPaymentRecord).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, invoiceRecordId: 62, createdByUserId: 7 }));
+  });
+  it("forwards internal payable three-way-match evidence only through a finance-authorized tenant route", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.evaluatePayableInvoiceThreeWayMatch).mockResolvedValue({ payableInvoiceRecordId: 72, status: "matched", receiptCount: 1, noPaymentExecution: true } as never);
+    await expect(caller().invoice.evaluateThreeWayMatch({ ventureId: 21, payableInvoiceRecordId: 72, purchaseOrderRecordId: 73 })).resolves.toMatchObject({ status: "matched", noPaymentExecution: true });
+    expect(service.evaluatePayableInvoiceThreeWayMatch).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, payableInvoiceRecordId: 72, purchaseOrderRecordId: 73, actorUserId: 7 }));
   });
   it("forwards a selected public-budget jurisdiction pack only through a finance-authorized venture route", async () => {
     vi.mocked(requireVentureRole).mockReset();

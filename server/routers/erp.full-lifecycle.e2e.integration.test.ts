@@ -60,6 +60,58 @@ describe("typed-route sales lifecycle with real authorization", () => {
     expect(audits.some(event => event.eventType === "workflow.task_completed")).toBe(true);
   });
 
+  it("records receipt-backed payable three-way-match evidence, permits only a matched payable approval, and blocks a mismatched payable", async () => {
+    const operator = callerFor(operatorUserId, operatorOpenId); const admin = callerFor(1, "owner");
+    const supplierCode = "VALIDATION-E2E-THREE-WAY-SUPPLIER-20260825";
+    const itemCode = "VALIDATION-E2E-THREE-WAY-ITEM-20260825";
+    const purchaseOrderNumber = "VALIDATION-E2E-THREE-WAY-PO-20260825";
+    const matchedInvoiceNumber = "VALIDATION-E2E-THREE-WAY-AP-20260825";
+    const mismatchedInvoiceNumber = "VALIDATION-E2E-THREE-WAY-AP-MISMATCH-20260825";
+    const masters = await operator.master.list({ ventureId });
+    let supplier = masters.find(master => master.domain === "supplier" && master.code === supplierCode);
+    if (!supplier) supplier = await operator.master.create({ ventureId, domain: "supplier", code: supplierCode, name: "VALIDATION-ONLY three-way-match supplier", attributes: { validationOnly: true, noExternalSupplierAction: true } });
+    let item = masters.find(master => master.domain === "item" && master.code === itemCode);
+    if (!item) item = await operator.master.create({ ventureId, domain: "item", code: itemCode, name: "VALIDATION-ONLY three-way-match item", attributes: { validationOnly: true } });
+    let records = await operator.records.list({ ventureId });
+    let purchaseOrder = records.find(record => record.recordNumber === purchaseOrderNumber);
+    if (!purchaseOrder) {
+      purchaseOrder = await operator.records.create({ ventureId, domain: "procurement", recordType: "purchase_order", recordNumber: purchaseOrderNumber, title: "VALIDATION-ONLY three-way-match purchase order", counterpartyMasterId: supplier.id, amount: 100, effectiveDate: "2026-08-25", data: { validationOnly: true, noSupplierPayment: true, noExternalProcurementAction: true } });
+    }
+    if (purchaseOrder.status === "draft") await operator.records.transition({ ventureId, operationalRecordId: purchaseOrder.id, targetStatus: "pending_approval", note: "VALIDATION-ONLY purchase order approval request for matching" });
+    purchaseOrder = (await operator.records.list({ ventureId })).find(record => record.id === purchaseOrder!.id)!;
+    if (purchaseOrder.status === "pending_approval") await operator.records.transition({ ventureId, operationalRecordId: purchaseOrder.id, targetStatus: "approved", note: "VALIDATION-ONLY approved purchase order for matching" });
+    purchaseOrder = (await operator.records.list({ ventureId })).find(record => record.id === purchaseOrder!.id)!;
+    const existingReceipt = (await operator.inventory.movements({ ventureId, itemMasterId: item.id })).some(movement => movement.operationalRecordId === purchaseOrder!.id && movement.movementType === "receipt");
+    if (!existingReceipt) {
+      await operator.inventory.receivePurchaseOrder({ ventureId, purchaseOrderRecordId: purchaseOrder.id, itemMasterId: item.id, quantity: 1, narrative: "VALIDATION-ONLY recorded receipt evidence", finalReceipt: true });
+    }
+    purchaseOrder = (await operator.records.list({ ventureId })).find(record => record.id === purchaseOrder!.id)!;
+    let settlements = await admin.invoice.settlements({ ventureId });
+    let matchedInvoice = settlements.find(item => item.invoice.recordNumber === matchedInvoiceNumber)?.invoice;
+    if (!matchedInvoice) matchedInvoice = await operator.invoice.create({ ventureId, invoiceType: "payable_invoice", recordNumber: matchedInvoiceNumber, title: "VALIDATION-ONLY matched supplier payable", counterpartyMasterId: supplier.id, amount: 100, effectiveDate: "2026-08-25", data: { validationOnly: true, noExternalDisbursement: true } });
+    if (matchedInvoice.status === "draft") await admin.records.transition({ ventureId, operationalRecordId: matchedInvoice.id, targetStatus: "pending_approval", note: "VALIDATION-ONLY payable approval request before matching" });
+    if (matchedInvoice.status === "draft" || matchedInvoice.status === "pending_approval") await expect(admin.records.transition({ ventureId, operationalRecordId: matchedInvoice.id, targetStatus: "approved", note: "VALIDATION-ONLY attempt before three-way match" })).rejects.toThrow("three-way match");
+    if (matchedInvoice.status === "draft" || matchedInvoice.status === "pending_approval") await admin.invoice.evaluateThreeWayMatch({ ventureId, payableInvoiceRecordId: matchedInvoice.id, purchaseOrderRecordId: purchaseOrder.id });
+    records = await admin.records.list({ ventureId });
+    const matchedAfterEvidence = records.find(record => record.id === matchedInvoice!.id)!;
+    if (matchedAfterEvidence.status === "draft" || matchedAfterEvidence.status === "pending_approval") await admin.records.transition({ ventureId, operationalRecordId: matchedAfterEvidence.id, targetStatus: "approved", note: "VALIDATION-ONLY approval after successful three-way match" });
+    settlements = await admin.invoice.settlements({ ventureId });
+    let mismatchedInvoice = settlements.find(item => item.invoice.recordNumber === mismatchedInvoiceNumber)?.invoice;
+    if (!mismatchedInvoice) mismatchedInvoice = await operator.invoice.create({ ventureId, invoiceType: "payable_invoice", recordNumber: mismatchedInvoiceNumber, title: "VALIDATION-ONLY mismatched supplier payable", counterpartyMasterId: supplier.id, amount: 101, effectiveDate: "2026-08-25", data: { validationOnly: true, noExternalDisbursement: true } });
+    if (mismatchedInvoice.status === "draft" || mismatchedInvoice.status === "pending_approval") await admin.invoice.evaluateThreeWayMatch({ ventureId, payableInvoiceRecordId: mismatchedInvoice.id, purchaseOrderRecordId: purchaseOrder.id });
+    records = await admin.records.list({ ventureId });
+    const mismatchedAfterEvidence = records.find(record => record.id === mismatchedInvoice!.id)!;
+    expect((matchedAfterEvidence.data as { threeWayMatch?: { status?: string; receiptCount?: number; noPaymentExecution?: boolean } }).threeWayMatch).toMatchObject({ status: "matched", receiptCount: 1, noPaymentExecution: true });
+    expect(records.find(record => record.id === matchedInvoice!.id)?.status).toBe("approved");
+    expect((mismatchedAfterEvidence.data as { threeWayMatch?: { status?: string; reasonCodes?: string[]; noPaymentExecution?: boolean } }).threeWayMatch).toMatchObject({ status: "mismatch", reasonCodes: ["invoice_exceeds_purchase_order"], noPaymentExecution: true });
+    if (mismatchedAfterEvidence.status === "draft") await admin.records.transition({ ventureId, operationalRecordId: mismatchedAfterEvidence.id, targetStatus: "pending_approval", note: "VALIDATION-ONLY payable mismatch approval request" });
+    const mismatchedForApproval = (await admin.records.list({ ventureId })).find(record => record.id === mismatchedInvoice!.id)!;
+    if (mismatchedForApproval.status === "pending_approval") await expect(admin.records.transition({ ventureId, operationalRecordId: mismatchedForApproval.id, targetStatus: "approved", note: "VALIDATION-ONLY blocked mismatch approval" })).rejects.toThrow("three-way match");
+    const audits = await admin.audit({ ventureId });
+    expect(audits.some(event => event.operationalRecordId === matchedInvoice!.id && event.eventType === "payable_invoice.three_way_match_evaluated")).toBe(true);
+    expect(audits.some(event => event.operationalRecordId === mismatchedInvoice!.id && event.eventType === "payable_invoice.three_way_match_evaluated")).toBe(true);
+  }, 20_000);
+
   it("persists explicit jurisdiction-neutral people, delivery, asset, service, and CRM work controls with approval evidence", async () => {
     const operator = callerFor(operatorUserId, operatorOpenId);
     const workControls = [
