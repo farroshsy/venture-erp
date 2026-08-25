@@ -130,3 +130,4 @@
 - [x] Implement finance-owned tenant-scoped configurable dimension definitions and active values for the accounting-control engine, without assigning statutory meaning, automatic posting, or external effects.
 - [x] Bind configured finance dimensions into immutable per-line journal-proposal snapshots with source, rule, period, currency, and evidence context, without creating journals or external effects.
 - [x] Implement bounded deterministic multi-line percentage allocation rules with fixed two-decimal residual handling and explainable proposal-only evidence; defer fixed, quantity, driver, and valuation allocations until separately governed.
+- [x] Design a read-only ledger-simulation layer for explainable accounting previews that cannot create journals, assign numbers, mutate balances, trigger integrations, or affect payroll compliance.

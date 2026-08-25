@@ -26,6 +26,10 @@ The initial proposal engine now supports one or more debit percentage allocation
 
 This is intentionally not a valuation, landed-cost, weight, volume, driver, cost-pool, fixed-amount, quantity, or labor/machine-hour allocation engine. Those allocation types require separate finance policy, source-data contracts, and controlled tests before adoption. No allocation creates or posts a journal, changes balances, calculates tax/payroll, issues a payment, files, or transmits externally.
 
+## 0.4 Read-only ledger-simulation design
+
+The companion `READ-ONLY-LEDGER-SIMULATION-DESIGN.md` defines the next safe preview layer. It consumes only immutable accounting-event, rule, proposal, and dimension snapshots; returns an explainable ephemeral result; and refuses incomplete, cross-tenant, unapproved, mixed-currency, or unbalanced inputs. It is intentionally separate from journal creation and posting.
+
 ## 1. Purpose and boundary
 
 This design adds a controlled seam between an operational fact and a finance-reviewed journal. A source module emits an **immutable internal accounting event**. A finance-owned, effective-dated posting-rule revision may evaluate that event into a **balanced journal proposal**. The proposal is separate from the authoritative journal and cannot post itself. Existing finance authorization, period controls, balanced-journal validation, and audit evidence remain the only path to a posted journal.
