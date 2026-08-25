@@ -204,10 +204,15 @@ describe("operational ERP router", () => {
     vi.mocked(service.listFinanceDimensions).mockResolvedValue([] as never);
     vi.mocked(service.createFinanceDimensionDefinition).mockResolvedValue({ id: 44, status: "draft" } as never);
     vi.mocked(service.activateFinanceDimensionDefinition).mockResolvedValue({ id: 44, status: "active" } as never);
+    vi.mocked(service.createFinanceDimensionValue).mockResolvedValue({ id: 45, status: "draft" } as never);
+    vi.mocked(service.activateFinanceDimensionValue).mockResolvedValue({ id: 45, status: "active" } as never);
     await expect(caller().financeDimensions.list({ ventureId: 21 })).resolves.toEqual([]);
     await expect(caller().financeDimensions.createDefinition({ ventureId: 21, code: "COST_CENTER", name: "Cost center", requiredForProposal: false })).resolves.toMatchObject({ id: 44 });
     await expect(caller().financeDimensions.activateDefinition({ ventureId: 21, financeDimensionDefinitionId: 44 })).resolves.toMatchObject({ status: "active" });
+    await expect(caller().financeDimensions.createValue({ ventureId: 21, financeDimensionDefinitionId: 44, code: "OPS-001", name: "Operations", attributes: {} })).resolves.toMatchObject({ id: 45, status: "draft" });
+    await expect(caller().financeDimensions.activateValue({ ventureId: 21, financeDimensionValueId: 45 })).resolves.toMatchObject({ status: "active" });
     expect(service.createFinanceDimensionDefinition).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, code: "COST_CENTER", createdByUserId: 7 }));
+    expect(service.createFinanceDimensionValue).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, financeDimensionDefinitionId: 44, code: "OPS-001", createdByUserId: 7 }));
   });
   it("allows a finance-authorized actor to request an auditable accounting-period close", async () => {
     vi.mocked(requireVentureRole).mockReset();

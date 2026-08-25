@@ -14,6 +14,8 @@ Migration `0018_awesome_naoko.sql` adds tenant-scoped finance-dimension definiti
 
 Each definition and value is unique in its active venture, carries a draft/active/retired lifecycle, and creates internal audit evidence with explicit no-automatic-posting and no-external-effect flags. Required-dimension enforcement and selector binding remain future governed increments after finance policy is configured.
 
+Journal Control now exposes the finance-owned catalog over the existing tenant-scoped contracts. Finance-authorized users can create draft definitions, opt into `requiredForProposal`, activate a non-retired definition, create draft values only under an active definition, and activate a non-retired value. The interface shows the retained lifecycle and value register, but it has no control to infer a source value, rewrite an event/proposal snapshot, create a journal, or post one. Activating a required definition remains a forward-looking refusal guard: a future proposal without the relevant retained source value is refused rather than populated from this catalog.
+
 ## 0.2 Frozen proposal-dimension snapshots
 
 When the engine evaluates an event, it reads the active finance-dimension definitions for the same venture and freezes a catalog snapshot into the proposal. Every generated line receives the same immutable context: tenant, source event, source document snapshot, source dimensions, evidence references, posting-rule code/revision, effective date, period, currency, and the active finance-dimension catalog with retained source values. A later rename, retirement, value change, or catalog restructure cannot alter the persisted proposal snapshot.
