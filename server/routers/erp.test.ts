@@ -28,6 +28,11 @@ vi.mock("../erp/service", () => ({
   approvePostingRuleRevision: vi.fn(),
   evaluateAccountingEventToProposal: vi.fn(),
   reviewJournalProposal: vi.fn(),
+  listFinanceDimensions: vi.fn(),
+  createFinanceDimensionDefinition: vi.fn(),
+  activateFinanceDimensionDefinition: vi.fn(),
+  createFinanceDimensionValue: vi.fn(),
+  activateFinanceDimensionValue: vi.fn(),
   listInventoryBalances: vi.fn(),
   listInventoryMovements: vi.fn(),
   recordInventoryMovement: vi.fn(),
@@ -179,6 +184,17 @@ describe("operational ERP router", () => {
     await expect(caller().accountingControl.reviewProposal({ ventureId: 21, journalProposalId: 92, decision: "approved", note: "Internal review only; no journal posting." })).resolves.toMatchObject({ noJournalCreated: true });
     expect(service.createPostingRuleRevision).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, eventType: "procurement_receipt", createdByUserId: 7 }));
     expect(service.reviewJournalProposal).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, journalProposalId: 92, decision: "approved", actorUserId: 7 }));
+  });
+  it("keeps configurable finance dimensions within the active venture and finance authorization", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.listFinanceDimensions).mockResolvedValue([] as never);
+    vi.mocked(service.createFinanceDimensionDefinition).mockResolvedValue({ id: 44, status: "draft" } as never);
+    vi.mocked(service.activateFinanceDimensionDefinition).mockResolvedValue({ id: 44, status: "active" } as never);
+    await expect(caller().financeDimensions.list({ ventureId: 21 })).resolves.toEqual([]);
+    await expect(caller().financeDimensions.createDefinition({ ventureId: 21, code: "COST_CENTER", name: "Cost center", requiredForProposal: false })).resolves.toMatchObject({ id: 44 });
+    await expect(caller().financeDimensions.activateDefinition({ ventureId: 21, financeDimensionDefinitionId: 44 })).resolves.toMatchObject({ status: "active" });
+    expect(service.createFinanceDimensionDefinition).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, code: "COST_CENTER", createdByUserId: 7 }));
   });
   it("allows a finance-authorized actor to request an auditable accounting-period close", async () => {
     vi.mocked(requireVentureRole).mockReset();

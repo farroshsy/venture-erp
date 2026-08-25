@@ -8,6 +8,12 @@ Migration `0017_condemned_leper_queen.sql` adds tenant-scoped immutable accounti
 
 The implemented initial selector vocabulary is intentionally narrower than the target design: exactly one literal active debit account and one literal active credit account, each using the retained functional event amount. A finance reviewer can approve or reject a proposal, but no proposal converts into, creates, or posts an `erp_journals` record. Future selector types, multi-line splits, valuation policy, and conversion must remain separately governed increments.
 
+## 0.1 Finance-dimension catalog foundation
+
+Migration `0018_awesome_naoko.sql` adds tenant-scoped finance-dimension definitions and dimension values. Finance-authorized users can create a draft dimension definition, activate it, create a draft value only under an active definition, and activate that value. The catalog is deliberately generic: it provides configuration vocabulary and lifecycle evidence for dimensions such as cost center, profit center, department, project, warehouse, or contract, but it does not assign statutory semantics, infer values, alter existing event snapshots, enforce a dimension on a proposal, or post a journal.
+
+Each definition and value is unique in its active venture, carries a draft/active/retired lifecycle, and creates internal audit evidence with explicit no-automatic-posting and no-external-effect flags. Required-dimension enforcement and selector binding remain future governed increments after finance policy is configured.
+
 ## 1. Purpose and boundary
 
 This design adds a controlled seam between an operational fact and a finance-reviewed journal. A source module emits an **immutable internal accounting event**. A finance-owned, effective-dated posting-rule revision may evaluate that event into a **balanced journal proposal**. The proposal is separate from the authoritative journal and cannot post itself. Existing finance authorization, period controls, balanced-journal validation, and audit evidence remain the only path to a posted journal.

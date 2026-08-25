@@ -9,6 +9,8 @@ import {
   erpCrmOpportunities,
   erpEmployeeProfiles,
   erpExchangeRates,
+  erpFinanceDimensionDefinitions,
+  erpFinanceDimensionValues,
   erpAssets,
   erpInventoryBalances,
   erpInventoryMovements,
@@ -573,6 +575,53 @@ export async function listAccountingControl(ventureId: number) {
     db.select().from(erpJournalProposals).where(eq(erpJournalProposals.ventureId, ventureId)).orderBy(desc(erpJournalProposals.updatedAt)),
   ]);
   return { events, rules, proposals };
+}
+
+export async function createFinanceDimensionDefinition(input: { ventureId: number; code: string; name: string; description?: string; requiredForProposal?: boolean; createdByUserId: number }) {
+  const db = await requireDb();
+  const result = await db.insert(erpFinanceDimensionDefinitions).values({ ventureId: input.ventureId, code: input.code.trim(), name: input.name.trim(), description: input.description?.trim() || null, requiredForProposal: Boolean(input.requiredForProposal), status: "draft", createdByUserId: input.createdByUserId });
+  const id = Number(result[0].insertId);
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: "finance_dimension.definition_created", actorUserId: input.createdByUserId, payload: { financeDimensionDefinitionId: id, code: input.code.trim(), requiredForProposal: Boolean(input.requiredForProposal), noAutomaticPosting: true, noExternalEffect: true } });
+  return { id, status: "draft" as const };
+}
+
+export async function activateFinanceDimensionDefinition(input: { ventureId: number; financeDimensionDefinitionId: number; actorUserId: number }) {
+  const db = await requireDb();
+  const [definition] = await db.select().from(erpFinanceDimensionDefinitions).where(and(eq(erpFinanceDimensionDefinitions.id, input.financeDimensionDefinitionId), eq(erpFinanceDimensionDefinitions.ventureId, input.ventureId))).limit(1);
+  if (!definition) throw new Error("Finance dimension definition not found in the active venture.");
+  if (definition.status === "retired") throw new Error("Retired finance dimension definitions cannot be activated.");
+  await db.update(erpFinanceDimensionDefinitions).set({ status: "active" }).where(eq(erpFinanceDimensionDefinitions.id, definition.id));
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: "finance_dimension.definition_activated", actorUserId: input.actorUserId, payload: { financeDimensionDefinitionId: definition.id, noAutomaticPosting: true, noExternalEffect: true } });
+  return { id: definition.id, status: "active" as const };
+}
+
+export async function createFinanceDimensionValue(input: { ventureId: number; financeDimensionDefinitionId: number; code: string; name: string; attributes: Record<string, unknown>; createdByUserId: number }) {
+  const db = await requireDb();
+  const [definition] = await db.select().from(erpFinanceDimensionDefinitions).where(and(eq(erpFinanceDimensionDefinitions.id, input.financeDimensionDefinitionId), eq(erpFinanceDimensionDefinitions.ventureId, input.ventureId))).limit(1);
+  if (!definition || definition.status !== "active") throw new Error("An active finance dimension definition is required before adding a value.");
+  const result = await db.insert(erpFinanceDimensionValues).values({ ventureId: input.ventureId, dimensionDefinitionId: definition.id, code: input.code.trim(), name: input.name.trim(), status: "draft", attributes: input.attributes, createdByUserId: input.createdByUserId });
+  const id = Number(result[0].insertId);
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: "finance_dimension.value_created", actorUserId: input.createdByUserId, payload: { financeDimensionValueId: id, financeDimensionDefinitionId: definition.id, code: input.code.trim(), noAutomaticPosting: true, noExternalEffect: true } });
+  return { id, status: "draft" as const };
+}
+
+export async function activateFinanceDimensionValue(input: { ventureId: number; financeDimensionValueId: number; actorUserId: number }) {
+  const db = await requireDb();
+  const [value] = await db.select().from(erpFinanceDimensionValues).where(and(eq(erpFinanceDimensionValues.id, input.financeDimensionValueId), eq(erpFinanceDimensionValues.ventureId, input.ventureId))).limit(1);
+  if (!value) throw new Error("Finance dimension value not found in the active venture.");
+  if (value.status === "retired") throw new Error("Retired finance dimension values cannot be activated.");
+  await db.update(erpFinanceDimensionValues).set({ status: "active" }).where(eq(erpFinanceDimensionValues.id, value.id));
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: "finance_dimension.value_activated", actorUserId: input.actorUserId, payload: { financeDimensionValueId: value.id, financeDimensionDefinitionId: value.dimensionDefinitionId, noAutomaticPosting: true, noExternalEffect: true } });
+  return { id: value.id, status: "active" as const };
+}
+
+export async function listFinanceDimensions(ventureId: number) {
+  const db = await requireDb();
+  const [definitions, values] = await Promise.all([
+    db.select().from(erpFinanceDimensionDefinitions).where(eq(erpFinanceDimensionDefinitions.ventureId, ventureId)).orderBy(desc(erpFinanceDimensionDefinitions.updatedAt)),
+    db.select().from(erpFinanceDimensionValues).where(eq(erpFinanceDimensionValues.ventureId, ventureId)).orderBy(desc(erpFinanceDimensionValues.updatedAt)),
+  ]);
+  return definitions.map(definition => ({ ...definition, values: values.filter(value => value.dimensionDefinitionId === definition.id) }));
 }
 
 export type InventoryMovementType = "receipt" | "issue" | "adjust_in" | "adjust_out" | "reserve" | "release";

@@ -1,4 +1,4 @@
-import { decimal, index, int, json, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { boolean, decimal, index, int, json, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -420,6 +420,38 @@ export const erpPostingRuleRevisions = mysqlTable("erp_posting_rule_revisions", 
 }, table => [
   uniqueIndex("erp_posting_rule_venture_code_revision_unique").on(table.ventureId, table.ruleCode, table.revision),
   index("erp_posting_rule_venture_event_status_idx").on(table.ventureId, table.eventType, table.status),
+]);
+
+export const erpFinanceDimensionDefinitions = mysqlTable("erp_finance_dimension_definitions", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  code: varchar("code", { length: 64 }).notNull(),
+  name: varchar("name", { length: 140 }).notNull(),
+  description: varchar("description", { length: 255 }),
+  status: mysqlEnum("status", ["draft", "active", "retired"]).default("draft").notNull(),
+  requiredForProposal: boolean("requiredForProposal").notNull().default(false),
+  createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("erp_finance_dimension_venture_code_unique").on(table.ventureId, table.code),
+  index("erp_finance_dimension_venture_status_idx").on(table.ventureId, table.status),
+]);
+
+export const erpFinanceDimensionValues = mysqlTable("erp_finance_dimension_values", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  dimensionDefinitionId: int("dimensionDefinitionId").notNull().references(() => erpFinanceDimensionDefinitions.id),
+  code: varchar("code", { length: 96 }).notNull(),
+  name: varchar("name", { length: 140 }).notNull(),
+  status: mysqlEnum("status", ["draft", "active", "retired"]).default("draft").notNull(),
+  attributes: json("attributes").notNull(),
+  createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("erp_finance_dimension_value_unique").on(table.ventureId, table.dimensionDefinitionId, table.code),
+  index("erp_finance_dimension_value_venture_status_idx").on(table.ventureId, table.status),
 ]);
 
 export const erpJournalProposals = mysqlTable("erp_journal_proposals", {

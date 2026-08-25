@@ -127,3 +127,4 @@
 - [x] Implement immutable tenant-scoped internal accounting events and finance-owned effective-dated declarative posting-rule revisions, with no automatic journal posting or external effect.
 - [x] Implement internal procurement-receipt event evaluation into balanced, human-reviewed journal proposals only, with explainability, refusal evidence, and no payroll/tax/payment/external action.
 - [x] Inspect the supplied ERP class project only as reference material and record any reusable conceptual patterns without executing untrusted code or importing its data blindly.
+- [x] Implement finance-owned tenant-scoped configurable dimension definitions and active values for the accounting-control engine, without assigning statutory meaning, automatic posting, or external effects.
