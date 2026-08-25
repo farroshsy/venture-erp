@@ -492,6 +492,7 @@ export async function createPostingRuleRevision(input: { ventureId: number; rule
   const existing = await db.select().from(erpPostingRuleRevisions).where(and(eq(erpPostingRuleRevisions.ventureId, input.ventureId), eq(erpPostingRuleRevisions.ruleCode, input.ruleCode.trim()))).orderBy(desc(erpPostingRuleRevisions.revision));
   const revision = (existing[0]?.revision ?? 0) + 1;
   const debitAllocations = input.debitAllocations?.length ? input.debitAllocations : [{ accountMasterId: input.debitAccountMasterId, allocationBasisPoints: 10_000, narrative: "Internal procurement receipt — inventory/receipt clearing debit" }];
+  if (debitAllocations.some(allocation => allocation.accountMasterId === input.creditAccountMasterId)) throw new Error("Posting-rule debit allocations must not use the balancing credit account.");
   for (const allocation of debitAllocations) await requireAccountMaster(db, input.ventureId, allocation.accountMasterId);
   const lineConfiguration = asPostingRuleLines([
     ...debitAllocations.map(line => ({ entrySide: "debit" as const, accountMasterId: line.accountMasterId, narrative: line.narrative, allocationBasisPoints: line.allocationBasisPoints })),

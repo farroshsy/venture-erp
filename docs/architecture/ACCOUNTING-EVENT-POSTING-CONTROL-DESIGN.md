@@ -24,6 +24,8 @@ An active definition marked `requiredForProposal` is a guard, not a defaulting m
 
 The initial proposal engine now supports one or more debit percentage allocations and one balancing credit, expressed in integer basis points. Debit percentages and the credit percentage must each total exactly 10,000 basis points. The evaluator calculates to two decimal places, applies any rounding residual deterministically to the final debit allocation, and persists the percentage, total cents, residual treatment, and frozen context on every proposal line. Existing one-debit/one-credit rule snapshots without an explicit percentage remain compatible as 100.00% mappings.
 
+Journal Control now exposes this existing bounded vocabulary directly to finance-authorized users. Its rule editor lets finance add or remove debit allocation lines, select a tenant chart-of-accounts master, state an integer basis-point allocation and line narrative, and see the live debit total against 10,000 basis points. It will not submit unless every line is complete, the debit total is exactly 10,000, and no debit allocation reuses the balancing credit account. The server repeats the balancing-credit account guard and continues to validate active same-tenant accounts and exact percentage totals; the UI is not a substitute for those controls.
+
 This is intentionally not a valuation, landed-cost, weight, volume, driver, cost-pool, fixed-amount, quantity, or labor/machine-hour allocation engine. Those allocation types require separate finance policy, source-data contracts, and controlled tests before adoption. No allocation creates or posts a journal, changes balances, calculates tax/payroll, issues a payment, files, or transmits externally.
 
 ## 0.4 Read-only ledger-simulation design

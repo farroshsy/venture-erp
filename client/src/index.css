@@ -11,10 +11,40 @@
   outline: none;
 }
 
+input.enterprise-input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input.enterprise-input[type="number"]::-webkit-inner-spin-button,
+input.enterprise-input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
 .enterprise-input:focus {
   border-color: #79ae9b;
   box-shadow: 0 0 0 3px rgb(28 112 93 / 0.1);
 }
+
+@media (min-width: 768px) {
+  input.enterprise-input[type="number"] {
+    width: 5.5rem;
+  }
+
+  label:has(> input.enterprise-input[type="number"]) {
+    min-width: 5.5rem;
+  }
+
+  div:has(> label > input.enterprise-input[type="number"]):has(> button.secondary-button) {
+    grid-template-columns: minmax(0, 1.1fr) minmax(5.5rem, 0.8fr) minmax(0, 1.2fr) auto !important;
+  }
+
+  .md\:grid-cols-\[1\.2fr_\.5fr_1\.3fr_auto\] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+}
+
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));

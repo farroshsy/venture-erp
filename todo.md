@@ -136,3 +136,4 @@
 - [x] Implement immutable procurement-receipt calculation evidence with canonical input/output hashes, predecessor hash chaining, metadata-only review state, and no posting or external effect.
 - [x] Add independent double-entry, allocation-total, and residual invariants plus a read-only calculation-evidence review surface; defer valuation, COGS, FX revaluation, investment, and payroll calculations.
 - [x] Draft a disabled proposal-to-journal conversion design with fail-closed prerequisites, immutable linkage, and no implementation or posting path.
+- [x] Expose finance-owned deterministic multi-line debit percentage allocations in the Journal Control rule editor, with exact 10,000-basis-point validation and no conversion or posting path.

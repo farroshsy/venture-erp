@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { getDb } = vi.hoisted(() => ({ getDb: vi.fn() }));
 vi.mock("../db", () => ({ getDb }));
 
-import { createOperationalRecord } from "./service";
+import { createOperationalRecord, createPostingRuleRevision } from "./service";
 
 function fakeDb(queryResults: unknown[][]) {
   const inserted: unknown[] = [];
@@ -12,6 +12,7 @@ function fakeDb(queryResults: unknown[][]) {
       from: vi.fn(() => ({
         where: vi.fn(() => ({
           limit: vi.fn(async () => queryResults.shift() ?? []),
+          orderBy: vi.fn(async () => queryResults.shift() ?? []),
         })),
       })),
     })),
@@ -83,5 +84,21 @@ describe("cross-border operational record controls", () => {
     getDb.mockResolvedValue(db);
 
     await expect(createOperationalRecord(input)).rejects.toThrow("Approved exchange rate not found for the selected currency pair in the active venture.");
+  });
+});
+
+describe("deterministic posting-rule allocation controls", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("refuses a debit allocation that reuses the balancing credit account", async () => {
+    const { db, inserted } = fakeDb([
+      [{ id: 10, ventureId: 21, domain: "account", status: "active" }],
+      [{ id: 11, ventureId: 21, domain: "account", status: "active" }],
+      [],
+    ]);
+    getDb.mockResolvedValue(db);
+
+    await expect(createPostingRuleRevision({ ventureId: 21, ruleCode: "VALIDATION-ALLOCATION-GUARD", ruleName: "Validation allocation guard", eventType: "procurement_receipt", effectiveFrom: "2026-08-25", debitAccountMasterId: 10, creditAccountMasterId: 11, debitAllocations: [{ accountMasterId: 11, allocationBasisPoints: 10_000, narrative: "Invalid balancing-account debit" }], changeRationale: "VALIDATION-ONLY allocation guard", createdByUserId: 7 })).rejects.toThrow("must not use the balancing credit account");
+    expect(inserted).toEqual([]);
   });
 });
