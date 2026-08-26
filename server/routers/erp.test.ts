@@ -9,6 +9,9 @@ vi.mock("../erp/service", () => ({
   listCanonicalItemMasterProfiles: vi.fn(),
   createCanonicalItemMasterProfile: vi.fn(),
   activateCanonicalItemMasterProfile: vi.fn(),
+  listCanonicalSupplierMasterProfiles: vi.fn(),
+  createCanonicalSupplierMasterProfile: vi.fn(),
+  activateCanonicalSupplierMasterProfile: vi.fn(),
   createMasterRecord: vi.fn(),
   getVentureCurrencyPolicy: vi.fn(),
   setVentureReportingCurrency: vi.fn(),
@@ -146,6 +149,15 @@ describe("operational ERP router", () => {
     expect(service.listCanonicalItemMasterProfiles).toHaveBeenCalledWith(21);
     expect(service.createCanonicalItemMasterProfile).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, itemMasterId: 88, baseUomCode: "EA", createdByUserId: 7 }));
     expect(service.activateCanonicalItemMasterProfile).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, itemMasterProfileId: 189, actorUserId: 7 }));
+  });
+  it("keeps canonical supplier profiles tenant-scoped, finance-authorized, and free of supplier or financial effects", async () => {
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() }); vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(service.listCanonicalSupplierMasterProfiles).mockResolvedValue([] as never); await expect(caller().master.supplierProfiles({ ventureId: 21 })).resolves.toEqual([]);
+    vi.mocked(service.createCanonicalSupplierMasterProfile).mockResolvedValue({ id: 190, supplierMasterId: 89, status: "draft", boundary: { canonicalMasterOnly: true, noSupplierCommunication: true, noPaymentExecution: true, noTaxCalculation: true, noValuationCalculation: true, noJournalCreated: true, noExternalEffect: true } } as never);
+    await expect(caller().master.createSupplierProfile({ ventureId: 21, supplierMasterId: 89, counterpartyType: "organization", procurementScope: "goods", identityEvidenceReference: "SUPPLIER-IDENTITY-EVIDENCE", procurementEvidenceReference: "SUPPLIER-PROCUREMENT-EVIDENCE", onboardingEligibility: "not_assessed", attributes: {} })).resolves.toMatchObject({ id: 190, boundary: { noSupplierCommunication: true, noPaymentExecution: true, noTaxCalculation: true, noValuationCalculation: true, noJournalCreated: true, noExternalEffect: true } });
+    vi.mocked(service.activateCanonicalSupplierMasterProfile).mockResolvedValue({ id: 190, status: "active", idempotent: false, boundary: { canonicalMasterOnly: true, noSupplierCommunication: true, noPaymentExecution: true, noTaxCalculation: true, noValuationCalculation: true, noJournalCreated: true, noExternalEffect: true } } as never);
+    await expect(caller().master.activateSupplierProfile({ ventureId: 21, supplierMasterProfileId: 190 })).resolves.toMatchObject({ status: "active", boundary: { noSupplierCommunication: true, noPaymentExecution: true, noTaxCalculation: true, noValuationCalculation: true, noJournalCreated: true, noExternalEffect: true } });
+    expect(service.createCanonicalSupplierMasterProfile).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, supplierMasterId: 89, createdByUserId: 7 })); expect(service.activateCanonicalSupplierMasterProfile).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, supplierMasterProfileId: 190, actorUserId: 7 }));
   });
   it("returns expanded real-record dashboard posture only inside the authorized venture", async () => {
     vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "viewer", status: "active", createdAt: new Date(), updatedAt: new Date() });
