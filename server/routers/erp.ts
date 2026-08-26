@@ -114,6 +114,9 @@ export const erpRouter = router({
   canonicalFinancialObjects: router({
     projection: protectedProcedure.input(ventureInput).query(async ({ ctx, input }) => { const membership = await requireOperationalRole(ctx.user.id, input.ventureId); requireVentureRole(membership.role, ["portfolio_admin", "venture_lead", "finance_lead"]); return erp.getCanonicalFinancialObjectProjection(input.ventureId); }),
   }),
+  semanticReadiness: router({
+    register: protectedProcedure.input(ventureInput).query(async ({ ctx, input }) => { const membership = await requireOperationalRole(ctx.user.id, input.ventureId); requireVentureRole(membership.role, ["portfolio_admin", "venture_lead", "finance_lead"]); return erp.getSemanticEvidenceGapReadiness(input.ventureId); }),
+  }),
   financeDimensions: router({
     list: protectedProcedure.input(ventureInput).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return erp.listFinanceDimensions(input.ventureId); }),
     createDefinition: protectedProcedure.input(ventureInput.extend({ code: z.string().trim().min(1).max(64), name: z.string().trim().min(1).max(140), description: z.string().trim().max(255).optional(), requiredForProposal: z.boolean().optional() })).mutation(async ({ ctx, input }) => { const membership = await requireOperationalRole(ctx.user.id, input.ventureId); requireVentureRole(membership.role, ["portfolio_admin", "venture_lead", "finance_lead"]); return erp.createFinanceDimensionDefinition({ ...input, createdByUserId: ctx.user.id }); }),
