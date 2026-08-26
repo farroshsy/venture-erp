@@ -351,6 +351,13 @@ describe("typed-route sales lifecycle with real authorization", () => {
     let asset = (await operator.deliveryAssets.assets({ ventureId })).find(row => row.assetTag === "VALIDATION-E2E-ASSET-CALC-20260824");
     if (!asset) asset = await operator.deliveryAssets.createAsset({ ventureId, assetMasterId: assetMaster.id, assetTag: "VALIDATION-E2E-ASSET-CALC-20260824", name: "VALIDATION-ONLY calculation-input asset", calculationInputs: { internalBasis: "24", jurisdictionNeutral: true }, attributes: { validationOnly: true } });
     if (asset.status === "draft") await admin.deliveryAssets.transitionAsset({ ventureId, assetId: asset.id, targetStatus: "in_service" });
+    const sourceFactMasterCode = "VALIDATION-E2E-ASSET-SOURCE-FACT-MASTER-20260826";
+    const sourceFactAssetTag = "VALIDATION-E2E-ASSET-SOURCE-FACT-20260826";
+    const sourceFacts = { internalAcquisitionReference: "ACQ-INT-VALIDATION-20260826", supplierReference: "SUPPLIER-REF-VALIDATION", warehouseCode: "WH-VALIDATION", costCenterCode: "CC-VALIDATION", projectCode: "PRJ-VALIDATION", evidenceReference: "EVIDENCE-ASSET-ACQUISITION-VALIDATION" };
+    let sourceFactMaster = (await operator.master.list({ ventureId })).find(master => master.domain === "asset" && master.code === sourceFactMasterCode);
+    if (!sourceFactMaster) sourceFactMaster = await operator.master.create({ ventureId, domain: "asset", code: sourceFactMasterCode, name: "VALIDATION-ONLY asset source-fact master", attributes: { validationOnly: true } });
+    let sourceFactAsset = (await operator.deliveryAssets.assets({ ventureId })).find(row => row.assetTag === sourceFactAssetTag);
+    if (!sourceFactAsset) sourceFactAsset = await operator.deliveryAssets.createAsset({ ventureId, assetMasterId: sourceFactMaster.id, assetTag: sourceFactAssetTag, name: "VALIDATION-ONLY asset source facts", sourceFacts, calculationInputs: { jurisdictionNeutral: true }, attributes: { validationOnly: true, noCapitalization: true, noDepreciation: true } });
     let maintenance = (await operator.deliveryAssets.maintenance({ ventureId })).find(row => row.workOrderNumber === "VALIDATION-E2E-MAINT-CALC-20260824");
     if (!maintenance) maintenance = await operator.deliveryAssets.createMaintenance({ ventureId, assetId: asset.id, workOrderNumber: "VALIDATION-E2E-MAINT-CALC-20260824", title: "VALIDATION-ONLY calculation-input maintenance", maintenanceType: "inspection", calculationInputs: { internalBasis: "2", jurisdictionNeutral: true }, attributes: { validationOnly: true } });
     if (maintenance.status === "draft") await operator.deliveryAssets.transitionMaintenance({ ventureId, maintenanceWorkOrderId: maintenance.id, targetStatus: "scheduled" });
@@ -360,9 +367,11 @@ describe("typed-route sales lifecycle with real authorization", () => {
     expect((await admin.deliveryAssets.tasks({ ventureId })).find(row => row.id === task!.id)?.calculationInputs).toMatchObject({ jurisdictionNeutral: true });
     expect((await admin.deliveryAssets.assets({ ventureId })).find(row => row.id === asset!.id)?.status).toBe("in_service");
     expect((await admin.deliveryAssets.assets({ ventureId })).find(row => row.id === asset!.id)?.calculationInputs).toMatchObject({ jurisdictionNeutral: true });
+    expect((await admin.deliveryAssets.assets({ ventureId })).find(row => row.id === sourceFactAsset!.id)?.sourceFacts).toEqual(sourceFacts);
     expect((await admin.deliveryAssets.maintenance({ ventureId })).find(row => row.id === maintenance!.id)?.calculationInputs).toMatchObject({ jurisdictionNeutral: true });
     expect(audits.some(event => event.eventType === "projects.project_transitioned")).toBe(true);
     expect(audits.some(event => event.eventType === "assets.maintenance_transitioned")).toBe(true);
+    expect(audits.some(event => event.eventType === "assets.asset_created" && (event.payload as { assetTag?: string; capturedSourceFactKeys?: string[]; noCapitalization?: boolean; noDepreciationCalculation?: boolean; noValuationCalculation?: boolean; noJournalPosting?: boolean; noExternalEffect?: boolean }).assetTag === sourceFactAssetTag && (event.payload as { capturedSourceFactKeys?: string[] }).capturedSourceFactKeys?.length === 6 && (event.payload as { noCapitalization?: boolean }).noCapitalization === true && (event.payload as { noDepreciationCalculation?: boolean }).noDepreciationCalculation === true && (event.payload as { noValuationCalculation?: boolean }).noValuationCalculation === true && (event.payload as { noJournalPosting?: boolean }).noJournalPosting === true && (event.payload as { noExternalEffect?: boolean }).noExternalEffect === true)).toBe(true);
   }, 20_000);
 
   it("enforces dedicated service requests and CRM opportunities beyond generic work records", async () => {
