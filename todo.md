@@ -167,3 +167,4 @@
 - [x] Research advanced evidence-first ERP and finance-control practices, then assess the supplied read-only valuation-engine and canonical-financial-object-model proposal against the current architecture and boundaries.
 - [x] Build contextual in-application utilization guidance that explains role-appropriate navigation, evidence, automation posture, and safe next actions without implying unavailable financial or regulatory capabilities.
 - [x] Modernize the Journal Control experience with guided evidence-first workflow framing and deterministic, human-gated automation assistance that cannot create/post journals or cause any financial or external effect.
+- [x] Strengthen the Costing Engine’s read-only inventory valuation review with explicit selected-layer rationale, unit-cost derivation, remaining-balance explanation, deterministic rounding/invariant evidence, and refusal of unsupported governed inputs without inventory or financial effects.
