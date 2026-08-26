@@ -61,6 +61,38 @@ describe("typed-route sales lifecycle with real authorization", () => {
     expect(audits.some(event => event.eventType === "workflow.task_completed")).toBe(true);
   });
 
+  it("captures explicitly supplied sales-fulfillment source facts on retained inventory issue evidence without revenue, COGS, journal, or external effects", async () => {
+    const operator = callerFor(operatorUserId, operatorOpenId); const admin = callerFor(1, "owner");
+    const customerCode = "VALIDATION-E2E-SALES-SOURCE-FACTS-CUSTOMER-20260826";
+    const itemCode = "VALIDATION-E2E-SALES-SOURCE-FACTS-ITEM-20260826";
+    const orderNumber = "VALIDATION-E2E-SALES-SOURCE-FACTS-ORDER-20260826";
+    const sourceFacts = { internalFulfillmentReference: "VALIDATION-FUL-INT-20260826", warehouseCode: "WH-VALIDATION", costCenterCode: "CC-VALIDATION", projectCode: "PRJ-VALIDATION", customerDeliveryReference: "CUSTOMER-DELIVERY-VALIDATION", evidenceReference: "EVIDENCE-SALES-FULFILLMENT-VALIDATION" };
+    let masters = await operator.master.list({ ventureId });
+    let customer = masters.find(master => master.domain === "customer" && master.code === customerCode);
+    if (!customer) customer = await operator.master.create({ ventureId, domain: "customer", code: customerCode, name: "VALIDATION-ONLY sales source-fact customer", attributes: { validationOnly: true, noExternalCustomerContact: true } });
+    let item = masters.find(master => master.domain === "item" && master.code === itemCode);
+    if (!item) item = await operator.master.create({ ventureId, domain: "item", code: itemCode, name: "VALIDATION-ONLY sales source-fact item", attributes: { validationOnly: true } });
+    const balance = (await operator.inventory.balances({ ventureId })).find(candidate => candidate.itemMasterId === item!.id);
+    if (!balance || Number(balance.onHandQuantity) < 1) await operator.inventory.recordMovement({ ventureId, itemMasterId: item.id, movementType: "adjust_in", quantity: 1, narrative: "VALIDATION-ONLY sales source-fact opening stock" });
+    let order = (await operator.records.list({ ventureId })).find(record => record.recordNumber === orderNumber);
+    if (!order) order = await operator.records.create({ ventureId, domain: "sales", recordType: "sales_order", recordNumber: orderNumber, title: "VALIDATION-ONLY sales fulfillment source facts", counterpartyMasterId: customer.id, amount: 1, effectiveDate: "2026-08-26", data: { validationOnly: true, noShipping: true, noBilling: true, noPayment: true, noRevenueRecognition: true, noCogsOrValuation: true } });
+    if (order.status === "draft") await operator.records.transition({ ventureId, operationalRecordId: order.id, targetStatus: "pending_approval", note: "VALIDATION-ONLY sales source-fact approval request" });
+    order = (await operator.records.list({ ventureId })).find(record => record.id === order!.id)!;
+    if (order.status === "pending_approval") await operator.records.transition({ ventureId, operationalRecordId: order.id, targetStatus: "approved", note: "VALIDATION-ONLY sales source-fact approval" });
+    const existingIssue = (await operator.inventory.movements({ ventureId, itemMasterId: item.id })).find(movement => movement.operationalRecordId === order!.id && movement.movementType === "issue");
+    const journalCountBefore = (await admin.journal.list({ ventureId })).length;
+    if (!existingIssue) {
+      await operator.sales.reserveInventory({ ventureId, salesOrderRecordId: order.id, itemMasterId: item.id, quantity: 1, narrative: "VALIDATION-ONLY sales source-fact reservation" });
+      await operator.sales.fulfillInventory({ ventureId, salesOrderRecordId: order.id, itemMasterId: item.id, quantity: 1, narrative: "VALIDATION-ONLY sales source-fact fulfillment", sourceFacts, finalFulfillment: true });
+    }
+    const issue = (await admin.inventory.movements({ ventureId, itemMasterId: item.id })).find(movement => movement.operationalRecordId === order!.id && movement.movementType === "issue")!;
+    const audits = await admin.audit({ ventureId });
+    expect(issue.sourceFacts).toEqual(sourceFacts);
+    expect((await admin.records.list({ ventureId })).find(record => record.id === order!.id)?.status).toBe("fulfilled");
+    expect(audits.some(event => event.operationalRecordId === order!.id && event.eventType === "sales_order.inventory_fulfilled" && (event.payload as { capturedSourceFactKeys?: string[]; noRevenueRecognition?: boolean; noCogsOrValuationCalculation?: boolean; noExternalEffect?: boolean }).capturedSourceFactKeys?.length === 6 && (event.payload as { noRevenueRecognition?: boolean }).noRevenueRecognition === true && (event.payload as { noCogsOrValuationCalculation?: boolean }).noCogsOrValuationCalculation === true && (event.payload as { noExternalEffect?: boolean }).noExternalEffect === true)).toBe(true);
+    expect((await admin.journal.list({ ventureId })).length).toBe(journalCountBefore);
+  }, 20_000);
+
   it("records receipt-backed payable three-way-match evidence, permits only a matched payable approval, and blocks a mismatched payable", async () => {
     const operator = callerFor(operatorUserId, operatorOpenId); const admin = callerFor(1, "owner");
     const supplierCode = "VALIDATION-E2E-THREE-WAY-SUPPLIER-20260825";

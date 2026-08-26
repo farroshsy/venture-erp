@@ -43,6 +43,7 @@ export type MasterDomain = "customer" | "supplier" | "item" | "employee" | "acco
 export type OperationalDomain = "finance" | "sales" | "procurement" | "inventory" | "people" | "payroll" | "projects" | "assets" | "service" | "crm";
 export type PostingRuleLine = { entrySide: "debit" | "credit"; accountMasterId: number; narrative: string; allocationBasisPoints?: number };
 export type ProcurementReceiptSourceFacts = { internalReceiptReference?: string; warehouseCode?: string; costCenterCode?: string; projectCode?: string; supplierDeliveryReference?: string; evidenceReference?: string };
+export type SalesFulfillmentSourceFacts = { internalFulfillmentReference?: string; warehouseCode?: string; costCenterCode?: string; projectCode?: string; customerDeliveryReference?: string; evidenceReference?: string };
 export type AccountClassificationFamily = "asset" | "liability" | "equity" | "revenue" | "expense" | "memo";
 export type AccountStatementSection = "current_assets" | "noncurrent_assets" | "current_liabilities" | "noncurrent_liabilities" | "equity" | "operating_revenue" | "other_income" | "operating_expense" | "other_expense" | "memo";
 
@@ -65,6 +66,20 @@ function normalizeProcurementReceiptSourceFacts(sourceFacts?: ProcurementReceipt
   if (!sourceFacts) return undefined;
   const fields: Array<[keyof ProcurementReceiptSourceFacts, number]> = [["internalReceiptReference", 96], ["warehouseCode", 96], ["costCenterCode", 96], ["projectCode", 96], ["supplierDeliveryReference", 160], ["evidenceReference", 180]];
   const normalized: ProcurementReceiptSourceFacts = {};
+  for (const [field, maxLength] of fields) {
+    const value = sourceFacts[field];
+    if (value === undefined) continue;
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.length > maxLength) throw new Error(`${field} must be non-empty and at most ${maxLength} characters when supplied.`);
+    normalized[field] = trimmed;
+  }
+  return Object.keys(normalized).length ? normalized : undefined;
+}
+
+function normalizeSalesFulfillmentSourceFacts(sourceFacts?: SalesFulfillmentSourceFacts) {
+  if (!sourceFacts) return undefined;
+  const fields: Array<[keyof SalesFulfillmentSourceFacts, number]> = [["internalFulfillmentReference", 96], ["warehouseCode", 96], ["costCenterCode", 96], ["projectCode", 96], ["customerDeliveryReference", 160], ["evidenceReference", 180]];
+  const normalized: SalesFulfillmentSourceFacts = {};
   for (const [field, maxLength] of fields) {
     const value = sourceFacts[field];
     if (value === undefined) continue;
@@ -980,7 +995,7 @@ export async function reserveSalesOrderInventory(input: { ventureId: number; sal
   return { salesOrderRecordId: salesOrder.id, inventoryMovementId: reservation.id, quantity: reservation.quantity, availableQuantity: reservation.availableQuantity };
 }
 
-export async function fulfillSalesOrderInventory(input: { ventureId: number; salesOrderRecordId: number; itemMasterId: number; quantity: number; narrative: string; finalFulfillment?: boolean; actorUserId: number }) {
+export async function fulfillSalesOrderInventory(input: { ventureId: number; salesOrderRecordId: number; itemMasterId: number; quantity: number; narrative: string; sourceFacts?: SalesFulfillmentSourceFacts; finalFulfillment?: boolean; actorUserId: number }) {
   const db = await requireDb();
   const quantity = Math.round(input.quantity * 1000) / 1000;
   if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Fulfillment quantity must be greater than zero.");
@@ -990,6 +1005,7 @@ export async function fulfillSalesOrderInventory(input: { ventureId: number; sal
   if (!['approved', 'posted'].includes(salesOrder.status)) throw new Error("Sales orders must be approved or posted before fulfillment.");
   const item = await requireMaster(db, input.ventureId, input.itemMasterId);
   if (item.domain !== "item") throw new Error("Sales-order fulfillment requires an item master record.");
+  const sourceFacts = normalizeSalesFulfillmentSourceFacts(input.sourceFacts);
   const orderMovements = await db.select().from(erpInventoryMovements).where(and(eq(erpInventoryMovements.ventureId, input.ventureId), eq(erpInventoryMovements.operationalRecordId, salesOrder.id), eq(erpInventoryMovements.itemMasterId, input.itemMasterId)));
   const reservedForOrder = orderMovements.reduce((total, movement) => total + (movement.movementType === "reserve" ? Number(movement.quantity) : movement.movementType === "release" ? -Number(movement.quantity) : 0), 0);
   if (reservedForOrder < quantity) throw new Error("Sales-order fulfillment cannot exceed the order-linked reserved inventory.");
@@ -1003,13 +1019,13 @@ export async function fulfillSalesOrderInventory(input: { ventureId: number; sal
     if (nextOnHand < 0 || nextReserved < 0 || nextReserved > nextOnHand) throw new Error("Inventory balance invariant failed.");
     await tx.update(erpInventoryBalances).set({ onHandQuantity: String(nextOnHand), reservedQuantity: String(nextReserved) }).where(eq(erpInventoryBalances.id, balance.id));
     const release = await tx.insert(erpInventoryMovements).values({ ventureId: input.ventureId, itemMasterId: input.itemMasterId, operationalRecordId: salesOrder.id, movementType: "release", quantity: String(quantity), onHandAfter: String(onHand), reservedAfter: String(nextReserved), narrative: `Release for fulfillment: ${input.narrative}`, createdByUserId: input.actorUserId });
-    const issue = await tx.insert(erpInventoryMovements).values({ ventureId: input.ventureId, itemMasterId: input.itemMasterId, operationalRecordId: salesOrder.id, movementType: "issue", quantity: String(quantity), onHandAfter: String(nextOnHand), reservedAfter: String(nextReserved), narrative: input.narrative, createdByUserId: input.actorUserId });
+    const issue = await tx.insert(erpInventoryMovements).values({ ventureId: input.ventureId, itemMasterId: input.itemMasterId, operationalRecordId: salesOrder.id, movementType: "issue", quantity: String(quantity), onHandAfter: String(nextOnHand), reservedAfter: String(nextReserved), narrative: input.narrative, sourceFacts: sourceFacts ?? null, createdByUserId: input.actorUserId });
     return { releaseMovementId: Number(release[0].insertId), issueMovementId: Number(issue[0].insertId), onHandQuantity: nextOnHand, reservedQuantity: nextReserved, availableQuantity: Math.round((nextOnHand - nextReserved) * 1000) / 1000 };
   });
   const status = input.finalFulfillment ? "fulfilled" : salesOrder.status;
   if (input.finalFulfillment) await db.update(erpOperationalRecords).set({ status, updatedAt: new Date() }).where(eq(erpOperationalRecords.id, salesOrder.id));
-  await createAuditEvent({ ventureId: input.ventureId, domain: "sales", operationalRecordId: salesOrder.id, eventType: "sales_order.inventory_fulfilled", actorUserId: input.actorUserId, payload: { itemMasterId: input.itemMasterId, quantity, releaseMovementId: outcome.releaseMovementId, issueMovementId: outcome.issueMovementId, finalFulfillment: Boolean(input.finalFulfillment), resultingStatus: status, noExternalShipmentOrBilling: true } });
-  return { salesOrderRecordId: salesOrder.id, quantity, status, finalFulfillment: Boolean(input.finalFulfillment), ...outcome };
+  await createAuditEvent({ ventureId: input.ventureId, domain: "sales", operationalRecordId: salesOrder.id, eventType: "sales_order.inventory_fulfilled", actorUserId: input.actorUserId, payload: { itemMasterId: input.itemMasterId, quantity, releaseMovementId: outcome.releaseMovementId, issueMovementId: outcome.issueMovementId, finalFulfillment: Boolean(input.finalFulfillment), resultingStatus: status, capturedSourceFactKeys: Object.keys(sourceFacts ?? {}), noRevenueRecognition: true, noCogsOrValuationCalculation: true, noExternalShipmentOrBilling: true, noExternalEffect: true } });
+  return { salesOrderRecordId: salesOrder.id, quantity, status, finalFulfillment: Boolean(input.finalFulfillment), sourceFacts, noRevenueRecognition: true as const, noCogsOrValuationCalculation: true as const, noExternalEffect: true as const, ...outcome };
 }
 
 export async function createWorkflowDefinition(input: { ventureId: number; key: string; name: string; domain: string; definition: { nodes: Array<{ id: string; type: "start" | "task" | "approval" | "gateway" | "end"; title: string }>; transitions: Array<{ from: string; to: string; condition?: string }>; trigger?: WorkflowTrigger }; createdByUserId: number }) {

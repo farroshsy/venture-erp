@@ -146,3 +146,4 @@
 - [x] Capture finance-owned attributable procurement-receipt source facts and permitted dimension context before immutable event emission, with no inferred values, valuation, posting, or external effect.
 - [x] Implement finance-owned effective-dated account-classification revisions for future formal reporting, with immutable historical linkage and no posting or statement calculation from unclassified lines.
 - [x] Implement a read-only formal-statement policy-readiness register that discloses unmet canonical-evidence and governance gates without calculating statements, posting journals, or changing balances.
+- [x] Capture attributable sales-fulfillment source facts in retained inventory issue evidence with no revenue recognition, valuation, COGS, posting, or external effect.

@@ -272,9 +272,9 @@ describe("operational ERP router", () => {
     vi.mocked(service.reserveSalesOrderInventory).mockResolvedValue({ salesOrderRecordId: 41, inventoryMovementId: 61, availableQuantity: 3 } as never);
     vi.mocked(service.fulfillSalesOrderInventory).mockResolvedValue({ salesOrderRecordId: 41, issueMovementId: 63, status: "fulfilled", finalFulfillment: true } as never);
     await expect(caller().sales.reserveInventory({ ventureId: 21, salesOrderRecordId: 41, itemMasterId: 13, quantity: 2, narrative: "Reserve approved order stock" })).resolves.toMatchObject({ inventoryMovementId: 61 });
-    await expect(caller().sales.fulfillInventory({ ventureId: 21, salesOrderRecordId: 41, itemMasterId: 13, quantity: 2, narrative: "Controlled internal fulfillment evidence", finalFulfillment: true })).resolves.toMatchObject({ status: "fulfilled" });
+    await expect(caller().sales.fulfillInventory({ ventureId: 21, salesOrderRecordId: 41, itemMasterId: 13, quantity: 2, narrative: "Controlled internal fulfillment evidence", sourceFacts: { internalFulfillmentReference: "FUL-INT-001", warehouseCode: "WH-JKT-01", costCenterCode: "OPS-001", projectCode: "PROJ-001", customerDeliveryReference: "CUSTOMER-DEL-01", evidenceReference: "EVID-FUL-01" }, finalFulfillment: true })).resolves.toMatchObject({ status: "fulfilled" });
     expect(service.reserveSalesOrderInventory).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, salesOrderRecordId: 41, itemMasterId: 13, actorUserId: 7 }));
-    expect(service.fulfillSalesOrderInventory).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, salesOrderRecordId: 41, itemMasterId: 13, actorUserId: 7, finalFulfillment: true }));
+    expect(service.fulfillSalesOrderInventory).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, salesOrderRecordId: 41, itemMasterId: 13, actorUserId: 7, sourceFacts: { internalFulfillmentReference: "FUL-INT-001", warehouseCode: "WH-JKT-01", costCenterCode: "OPS-001", projectCode: "PROJ-001", customerDeliveryReference: "CUSTOMER-DEL-01", evidenceReference: "EVID-FUL-01" }, finalFulfillment: true }));
   });
   it("forwards customer-linked invoice and internal payment evidence through finance-authorized tenant routes", async () => {
     vi.mocked(requireVentureRole).mockReset();
