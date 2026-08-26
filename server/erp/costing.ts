@@ -106,10 +106,15 @@ export async function createReceiptCostLayer(input: { ventureId: number; sourceI
 
 function allocationLines(input: { targets: Array<{ id: number; quantity: number; originalValue: number; sourceSnapshot: unknown }>; driver: AllocationDriver; manualDrivers?: Array<{ costLayerId: number; driverValue: number }>; suppliedTotal: number }) {
   const manualByLayerId = new Map((input.manualDrivers ?? []).map(entry => [entry.costLayerId, entry.driverValue]));
-  const raw = input.targets.map(target => ({ target, driverValue: input.driver === "quantity" ? target.quantity : input.driver === "value" ? target.originalValue : input.driver === "weight" || input.driver === "volume" ? Number((target.sourceSnapshot as Record<string, unknown>)?.[input.driver] ?? 0) : manualByLayerId.get(target.id) ?? 0 }));
+  const raw = input.targets.map(target => {
+    const sourceSnapshot = target.sourceSnapshot as Record<string, unknown>; const sourceFacts = (sourceSnapshot?.sourceFacts ?? {}) as Record<string, unknown>;
+    const measureValue = input.driver === "weight" || input.driver === "volume" ? Number(sourceFacts[input.driver] ?? sourceSnapshot?.[input.driver] ?? 0) : 0;
+    const measureUnit = input.driver === "weight" ? sourceFacts.weightUnit : input.driver === "volume" ? sourceFacts.volumeUnit : undefined;
+    return { target, driverValue: input.driver === "quantity" ? target.quantity : input.driver === "value" ? target.originalValue : input.driver === "weight" || input.driver === "volume" ? measureValue : manualByLayerId.get(target.id) ?? 0, driverUnit: typeof measureUnit === "string" ? measureUnit : null };
+  });
   const totalDriver = raw.reduce((sum, line) => sum + line.driverValue, 0); if (!Number.isFinite(totalDriver) || totalDriver <= 0) throw new Error("Selected allocation driver has no positive eligible total.");
   let allocatedCents = 0; const totalCents = Math.round(input.suppliedTotal * 100);
-  const lines = raw.map((line, index) => { const final = index === raw.length - 1; const cents = final ? totalCents - allocatedCents : Math.floor(totalCents * line.driverValue / totalDriver); allocatedCents += cents; return { costLayerId: line.target.id, driverValue: line.driverValue, allocatedValue: money(cents / 100), allocatedCents: cents, residualApplied: final ? totalCents - (allocatedCents - cents) - cents : 0 }; });
+  const lines = raw.map((line, index) => { const final = index === raw.length - 1; const cents = final ? totalCents - allocatedCents : Math.floor(totalCents * line.driverValue / totalDriver); allocatedCents += cents; return { costLayerId: line.target.id, driverValue: line.driverValue, driverUnit: line.driverUnit, allocatedValue: money(cents / 100), allocatedCents: cents, residualApplied: final ? totalCents - (allocatedCents - cents) - cents : 0 }; });
   return { lines, totalDriver, allocationTotal: money(lines.reduce((sum, line) => sum + line.allocatedValue, 0)), residualTargetLayerId: lines[lines.length - 1]?.costLayerId ?? null };
 }
 

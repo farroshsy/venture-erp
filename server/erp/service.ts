@@ -42,7 +42,7 @@ import { availableBudget, calculateTax, canTransition, convertCurrency, normaliz
 export type MasterDomain = "customer" | "supplier" | "item" | "employee" | "account" | "project" | "asset" | "location" | "compensation_component" | "tax_category";
 export type OperationalDomain = "finance" | "sales" | "procurement" | "inventory" | "people" | "payroll" | "projects" | "assets" | "service" | "crm";
 export type PostingRuleLine = { entrySide: "debit" | "credit"; accountMasterId: number; narrative: string; allocationBasisPoints?: number };
-export type ProcurementReceiptSourceFacts = { internalReceiptReference?: string; warehouseCode?: string; costCenterCode?: string; profitCenterCode?: string; internalOrderCode?: string; projectCode?: string; supplierDeliveryReference?: string; evidenceReference?: string };
+export type ProcurementReceiptSourceFacts = { internalReceiptReference?: string; warehouseCode?: string; costCenterCode?: string; profitCenterCode?: string; internalOrderCode?: string; projectCode?: string; supplierDeliveryReference?: string; evidenceReference?: string; weight?: number; weightUnit?: "kg" | "g" | "lb" | "t"; volume?: number; volumeUnit?: "m3" | "l" | "ft3" };
 export type SalesFulfillmentSourceFacts = { internalFulfillmentReference?: string; warehouseCode?: string; costCenterCode?: string; projectCode?: string; customerDeliveryReference?: string; evidenceReference?: string };
 export type AccountClassificationFamily = "asset" | "liability" | "equity" | "revenue" | "expense" | "memo";
 export type AccountStatementSection = "current_assets" | "noncurrent_assets" | "current_liabilities" | "noncurrent_liabilities" | "equity" | "operating_revenue" | "other_income" | "operating_expense" | "other_expense" | "memo";
@@ -64,7 +64,7 @@ function validateAccountClassification(input: { classificationFamily: AccountCla
 
 function normalizeProcurementReceiptSourceFacts(sourceFacts?: ProcurementReceiptSourceFacts) {
   if (!sourceFacts) return undefined;
-  const fields: Array<[keyof ProcurementReceiptSourceFacts, number]> = [["internalReceiptReference", 96], ["warehouseCode", 96], ["costCenterCode", 96], ["profitCenterCode", 96], ["internalOrderCode", 96], ["projectCode", 96], ["supplierDeliveryReference", 160], ["evidenceReference", 180]];
+  const fields: Array<["internalReceiptReference" | "warehouseCode" | "costCenterCode" | "profitCenterCode" | "internalOrderCode" | "projectCode" | "supplierDeliveryReference" | "evidenceReference", number]> = [["internalReceiptReference", 96], ["warehouseCode", 96], ["costCenterCode", 96], ["profitCenterCode", 96], ["internalOrderCode", 96], ["projectCode", 96], ["supplierDeliveryReference", 160], ["evidenceReference", 180]];
   const normalized: ProcurementReceiptSourceFacts = {};
   for (const [field, maxLength] of fields) {
     const value = sourceFacts[field];
@@ -73,6 +73,16 @@ function normalizeProcurementReceiptSourceFacts(sourceFacts?: ProcurementReceipt
     if (!trimmed || trimmed.length > maxLength) throw new Error(`${field} must be non-empty and at most ${maxLength} characters when supplied.`);
     normalized[field] = trimmed;
   }
+  const normalizeMeasure = (value: number | undefined, unit: string | undefined, name: "weight" | "volume", units: readonly string[]) => {
+    if ((value === undefined) !== (unit === undefined)) throw new Error(`${name} and ${name}Unit must be supplied together.`);
+    if (value === undefined || unit === undefined) return;
+    if (!Number.isFinite(value) || value <= 0 || value > 1_000_000_000) throw new Error(`${name} must be a positive finite value within the permitted range when supplied.`);
+    if (!units.includes(unit)) throw new Error(`${name}Unit is not supported.`);
+    if (name === "weight") { normalized.weight = Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000; normalized.weightUnit = unit as ProcurementReceiptSourceFacts["weightUnit"]; }
+    else { normalized.volume = Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000; normalized.volumeUnit = unit as ProcurementReceiptSourceFacts["volumeUnit"]; }
+  };
+  normalizeMeasure(sourceFacts.weight, sourceFacts.weightUnit, "weight", ["kg", "g", "lb", "t"]);
+  normalizeMeasure(sourceFacts.volume, sourceFacts.volumeUnit, "volume", ["m3", "l", "ft3"]);
   return Object.keys(normalized).length ? normalized : undefined;
 }
 
