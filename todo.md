@@ -153,3 +153,8 @@
 - [x] Preserve the supplied enterprise-finance research roadmap in versioned project documentation, including its priorities, long-term architecture, and explicit governance/dependency caveats.
 - [x] Update the repository README with the governed research roadmap, implementation posture, developer workflow, and safe operating boundaries.
 - [x] Add an in-product help guide that explains how to navigate and use the venture-scoped control workspace without implying unenabled financial, regulatory, or payroll behavior.
+- [x] Define the Costing Engine bounded-context design, shared-future seam, and explicit no-posting/no-ledger/no-payroll control boundary.
+- [x] Implement tenant-scoped effective-dated finance-owned inventory valuation policy revisions and immutable cost-layer evidence.
+- [x] Implement deterministic landed-cost allocation evidence with cost-center, profit-center, and internal-order attribution, explainability, and invariants.
+- [x] Add read-only valuation previews, validation reports, and immutable calculation-evidence chain linkage without valuation posting or financial-statement mutation.
+- [x] Expose governed Costing Engine policy, evidence, and preview controls with finance RBAC, responsive review, documentation, and full validation.

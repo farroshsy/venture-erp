@@ -162,6 +162,13 @@
       "when": 1787705251316,
       "tag": "0022_cynical_morg",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1787706536511,
+      "tag": "0023_bitter_valkyrie",
+      "breakpoints": true
     }
   ]
 }

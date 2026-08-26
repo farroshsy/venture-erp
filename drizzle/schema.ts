@@ -549,6 +549,79 @@ export const erpInventoryMovements = mysqlTable("erp_inventory_movements", {
   index("erp_stock_move_venture_item_idx").on(table.ventureId, table.itemMasterId),
 ]);
 
+export const erpCostingPolicyRevisions = mysqlTable("erp_costing_policy_revisions", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  policyCode: varchar("policyCode", { length: 96 }).notNull(),
+  policyName: varchar("policyName", { length: 160 }).notNull(),
+  costDomain: mysqlEnum("costDomain", ["inventory", "manufacturing", "project", "service", "asset", "investment"]).notNull(),
+  valuationMethod: mysqlEnum("valuationMethod", ["fifo", "lifo", "moving_average", "weighted_average", "standard_cost", "specific_identification"]).notNull(),
+  revision: int("revision").notNull(),
+  effectiveFrom: varchar("effectiveFrom", { length: 10 }).notNull(),
+  effectiveTo: varchar("effectiveTo", { length: 10 }),
+  status: mysqlEnum("status", ["draft", "reviewed", "approved", "superseded", "retired"]).default("draft").notNull(),
+  policyConfiguration: json("policyConfiguration").notNull(),
+  sourceRequirements: json("sourceRequirements").notNull(),
+  rationale: varchar("rationale", { length: 255 }).notNull(),
+  adrReference: varchar("adrReference", { length: 96 }),
+  createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+  approvedByUserId: int("approvedByUserId").references(() => users.id),
+  approvedAt: timestamp("approvedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("erp_cost_policy_venture_code_revision_unique").on(table.ventureId, table.policyCode, table.revision),
+  index("erp_cost_policy_venture_domain_status_idx").on(table.ventureId, table.costDomain, table.status),
+]);
+
+export const erpCostLayers = mysqlTable("erp_cost_layers", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  layerKey: varchar("layerKey", { length: 140 }).notNull(),
+  itemMasterId: int("itemMasterId").notNull().references(() => erpMasterRecords.id),
+  sourceInventoryMovementId: int("sourceInventoryMovementId").references(() => erpInventoryMovements.id),
+  costingPolicyRevisionId: int("costingPolicyRevisionId").notNull().references(() => erpCostingPolicyRevisions.id),
+  layerType: mysqlEnum("layerType", ["receipt", "issue", "landed_cost"]).notNull(),
+  quantity: decimal("quantity", { precision: 18, scale: 3 }).notNull(),
+  remainingQuantity: decimal("remainingQuantity", { precision: 18, scale: 3 }).notNull(),
+  originalValue: decimal("originalValue", { precision: 18, scale: 2 }).notNull(),
+  remainingValue: decimal("remainingValue", { precision: 18, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull(),
+  sourceSnapshot: json("sourceSnapshot").notNull(),
+  attributionSnapshot: json("attributionSnapshot").notNull(),
+  evidenceSnapshot: json("evidenceSnapshot").notNull(),
+  sourceHash: varchar("sourceHash", { length: 64 }).notNull(),
+  createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("erp_cost_layer_venture_key_unique").on(table.ventureId, table.layerKey),
+  index("erp_cost_layer_venture_item_idx").on(table.ventureId, table.itemMasterId, table.createdAt),
+  index("erp_cost_layer_venture_policy_idx").on(table.ventureId, table.costingPolicyRevisionId),
+]);
+
+export const erpCostingCalculationEvidence = mysqlTable("erp_costing_calculation_evidence", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  calculationKey: varchar("calculationKey", { length: 140 }).notNull(),
+  calculationType: mysqlEnum("calculationType", ["valuation_preview", "landed_cost_allocation", "validation_report"]).notNull(),
+  costingPolicyRevisionId: int("costingPolicyRevisionId").references(() => erpCostingPolicyRevisions.id),
+  costLayerId: int("costLayerId").references(() => erpCostLayers.id),
+  accountingCalculationEvidenceId: int("accountingCalculationEvidenceId").references(() => erpAccountingCalculationEvidence.id),
+  engineVersion: varchar("engineVersion", { length: 32 }).notNull(),
+  status: mysqlEnum("status", ["completed", "refused"]).notNull(),
+  inputHash: varchar("inputHash", { length: 64 }).notNull(),
+  outputHash: varchar("outputHash", { length: 64 }).notNull(),
+  previousRecordHash: varchar("previousRecordHash", { length: 64 }),
+  recordHash: varchar("recordHash", { length: 64 }).notNull(),
+  inputSnapshot: json("inputSnapshot").notNull(),
+  calculationSnapshot: json("calculationSnapshot").notNull(),
+  invariantSnapshot: json("invariantSnapshot").notNull(),
+  calculatedByUserId: int("calculatedByUserId").notNull().references(() => users.id),
+  calculatedAt: timestamp("calculatedAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("erp_cost_calc_venture_key_unique").on(table.ventureId, table.calculationKey),
+  index("erp_cost_calc_venture_type_idx").on(table.ventureId, table.calculationType, table.calculatedAt),
+]);
+
 export const erpWorkflowDefinitions = mysqlTable("erp_workflow_definitions", {
   id: int("id").autoincrement().primaryKey(),
   ventureId: int("ventureId").notNull().references(() => ventures.id),

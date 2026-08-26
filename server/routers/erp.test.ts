@@ -92,11 +92,24 @@ vi.mock("../erp/asia", () => ({
   queueSandboxIntegrationJob: vi.fn(),
   simulateSandboxIntegrationJob: vi.fn(),
 }));
+vi.mock("../erp/costing", () => ({
+  valuationMethods: ["fifo", "lifo", "moving_average", "weighted_average", "standard_cost", "specific_identification"],
+  landedCostCategories: ["freight", "insurance", "customs", "duty", "handling", "miscellaneous"],
+  allocationDrivers: ["quantity", "weight", "value", "volume", "manual_finance_approved"],
+  listCostingControl: vi.fn(),
+  createCostingPolicyRevision: vi.fn(),
+  approveCostingPolicyRevision: vi.fn(),
+  createReceiptCostLayer: vi.fn(),
+  previewInventoryValuation: vi.fn(),
+  createLandedCostAllocationEvidence: vi.fn(),
+  getCostingValidationReport: vi.fn(),
+}));
 vi.mock("../platform/tenant", () => ({ requireVentureMembership: vi.fn(), requireVentureRole: vi.fn() }));
 vi.mock("../db", () => ({ listVenturesForUser: vi.fn() }));
 
 import * as service from "../erp/service";
 import * as asia from "../erp/asia";
+import * as costing from "../erp/costing";
 import { listVenturesForUser } from "../db";
 import { requireVentureMembership, requireVentureRole } from "../platform/tenant";
 import type { TrpcContext } from "../_core/context";
@@ -312,6 +325,19 @@ describe("operational ERP router", () => {
     vi.mocked(service.approveMatchedPayableInvoice).mockResolvedValue({ id: 72, from: "pending_approval", to: "approved" } as never);
     await expect(caller().invoice.approveMatchedPayable({ ventureId: 21, payableInvoiceRecordId: 72, note: "Matched internal evidence reviewed" })).resolves.toMatchObject({ to: "approved" });
     expect(service.approveMatchedPayableInvoice).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, payableInvoiceRecordId: 72, actorUserId: 7, note: "Matched internal evidence reviewed" }));
+  });
+  it("forwards finance-authorized Costing Engine policy, valuation preview, and landed-cost allocation inputs without a posting route", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(costing.createCostingPolicyRevision).mockResolvedValue({ id: 88, revision: 1, status: "draft", noValuationPosting: true } as never);
+    vi.mocked(costing.previewInventoryValuation).mockResolvedValue({ id: 89, calculationKey: "COST-VALUATION-TEST", recordHash: "a".repeat(64), status: "completed" } as never);
+    vi.mocked(costing.createLandedCostAllocationEvidence).mockResolvedValue({ id: 90, calculationKey: "COST-ALLOC-TEST", recordHash: "b".repeat(64), status: "completed" } as never);
+    await expect(caller().costing.createPolicyRevision({ ventureId: 21, policyCode: "INV-VAL", policyName: "Inventory FIFO", costDomain: "inventory", valuationMethod: "fifo", effectiveFrom: "2026-08-26", policyConfiguration: {}, sourceRequirements: {}, rationale: "Validation-only finance policy" })).resolves.toMatchObject({ noValuationPosting: true });
+    await caller().costing.previewValuation({ ventureId: 21, itemMasterId: 13, costingPolicyRevisionId: 88, costingDate: "2026-08-26", issueQuantity: 2, rationale: "Validation-only read-only preview" });
+    await caller().costing.allocateLandedCost({ ventureId: 21, costingPolicyRevisionId: 88, costingDate: "2026-08-26", landedCostCategory: "freight", allocationDriver: "quantity", totalAmount: 10, currency: "USD", targetCostLayerIds: [101, 102], rationale: "Validation-only deterministic allocation" });
+    expect(costing.createCostingPolicyRevision).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, policyCode: "INV-VAL", valuationMethod: "fifo", createdByUserId: 7 }));
+    expect(costing.previewInventoryValuation).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, itemMasterId: 13, costingPolicyRevisionId: 88, actorUserId: 7 }));
+    expect(costing.createLandedCostAllocationEvidence).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, landedCostCategory: "freight", allocationDriver: "quantity", targetCostLayerIds: [101, 102], actorUserId: 7 }));
   });
   it("forwards a selected public-budget jurisdiction pack only through a finance-authorized venture route", async () => {
     vi.mocked(requireVentureRole).mockReset();

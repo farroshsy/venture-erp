@@ -7,6 +7,10 @@
 
 The supplied roadmap recommends continuing non-payroll ERP evolution rather than waiting on the Indonesian payroll reviewer. It prioritizes a transition from the current service-aligned operational control plane toward an institutional finance and enterprise-operations platform. The core proposed sequence is inventory valuation and cost accounting, COGS/margins, fixed assets, treasury, an Investment Book of Record (IBOR), enterprise reporting, budgeting, manufacturing, supply chain, and a canonical-evidence AI finance copilot.
 
+### Adopted architectural adjustment: Costing Engine, not a one-off valuation calculator
+
+The authorized implementation direction is a shared **Costing Engine** bounded context rather than an isolated inventory-valuation feature. Its first active scope is inventory policy, immutable receipt layers, deterministic landed-cost evidence, read-only previews, and validation. The same vocabulary is reserved—but **not activated**—for future manufacturing BOM/routing/WIP/variance, project and service cost, asset capitalization evidence, and investment cost-basis lots. This avoids parallel calculators while preserving separate authorization and evidence gates for each domain.
+
 This is directionally compatible with Venture ERP’s existing immutable source-event, deterministic calculation-evidence, finance-owned rule, account-classification, reporting-readiness, and source-fact foundations. It does **not** override their safety boundaries. In particular, the current implementation must not calculate valuation/COGS, recognize revenue, capitalize/depreciate assets, calculate investments, create/post journals through the control engine, mutate GL balances, determine tax/payroll, execute payments, file, transmit, or represent statutory/financial-statement readiness without separately approved scope, policy, evidence, tests, and professional review where required.
 
 > The user’s notes correctly preserve payroll as a separate reviewer-gated consumer of the same evidence architecture. The Indonesian payroll pack remains draft, unreviewed, inactive, unselected, and non-calculating until written, effective-dated approval from a qualified Indonesian payroll/tax reviewer is supplied.
@@ -56,7 +60,7 @@ flowchart TD
   COSTING --> BUDGET[Planning and budgeting]
 ```
 
-The diagram is a **target architecture**, not a statement of implemented modules. In the current codebase, operational source controls, procurement receipt accounting events, calculation evidence, controlled reporting, finance classifications/readiness, and source-fact capture exist in bounded form. Future posting, universal ledger, formal statements, valuation/costing, IBOR, treasury/risk, manufacturing costing, and planning/budgeting remain gated work.
+The diagram is a **target architecture**, not a statement of implemented modules. In the current codebase, operational source controls, procurement receipt accounting events, calculation evidence, controlled reporting, finance classifications/readiness, source-fact capture, and the first evidence-only Costing Engine foundation exist in bounded form. Future posting, universal ledger, formal statements, COGS/margin presentation, manufacturing costing, project/service costing, asset capitalization/depreciation, investment calculation, IBOR, treasury/risk, and planning/budgeting remain separately gated work.
 
 ## Delivery sequencing and decision gates
 
@@ -65,6 +69,12 @@ The diagram is a **target architecture**, not a statement of implemented modules
 3. Implement one bounded, testable policy/evidence foundation at a time. Each increment must retain source snapshots, effective-dated policy revision, deterministic result/refusal evidence, tenant and role controls, and no hidden balance mutation.
 4. Expand reporting only from completed immutable calculation evidence; do not introduce a competing calculator or promote activity views to formal statements.
 5. Introduce integration, data warehouse, outbox, or service-extraction infrastructure only when a measurable ownership, scale, reliability, compliance, or release-independence signal justifies it.
+
+## Implemented Costing Engine foundation
+
+The first Costing Engine increment is documented in `docs/architecture/COSTING-ENGINE-FOUNDATION-DESIGN.md`. It retains finance-owned effective-dated policy revisions for FIFO, LIFO, moving average, weighted average, standard cost, and specific identification; immutable receipt cost layers; deterministic landed-cost allocation evidence; policy-scoped validation; and hash-chained preview/validation evidence. Unsupported canonical inputs refuse instead of being inferred. The `/costing` workspace exposes these controls only to finance-authorized venture members.
+
+> This foundation creates no COGS, inventory revaluation, journal, ledger entry, balance mutation, financial-statement value, tax result, payroll result, payment, filing, integration, or external effect. It is a governed evidence foundation, not a production valuation, manufacturing, project, service, asset, investment, or statutory accounting engine.
 
 ## Provenance and limitations
 
