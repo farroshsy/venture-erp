@@ -175,6 +175,28 @@ export const erpMasterRecords = mysqlTable("erp_master_records", {
   index("erp_master_venture_domain_idx").on(table.ventureId, table.domain),
 ]);
 
+export const erpItemMasterProfiles = mysqlTable("erp_item_master_profiles", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  itemMasterId: int("itemMasterId").notNull().references(() => erpMasterRecords.id),
+  itemType: mysqlEnum("itemType", ["stock_item", "non_stock_item", "service"]).notNull(),
+  inventoryTracked: boolean("inventoryTracked").notNull().default(false),
+  baseUomCode: varchar("baseUomCode", { length: 24 }).notNull(),
+  unitEvidenceReference: varchar("unitEvidenceReference", { length: 180 }).notNull(),
+  productFamily: varchar("productFamily", { length: 96 }),
+  costingEligibility: mysqlEnum("costingEligibility", ["not_assessed", "evidence_only_eligible", "blocked"]).default("not_assessed").notNull(),
+  status: mysqlEnum("status", ["draft", "active", "retired"]).default("draft").notNull(),
+  attributes: json("attributes").notNull(),
+  createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+  activatedByUserId: int("activatedByUserId").references(() => users.id),
+  activatedAt: timestamp("activatedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("erp_item_profile_venture_master_unique").on(table.ventureId, table.itemMasterId),
+  index("erp_item_profile_venture_status_idx").on(table.ventureId, table.status),
+]);
+
 export const erpEmployeeProfiles = mysqlTable("erp_employee_profiles", {
   id: int("id").autoincrement().primaryKey(),
   ventureId: int("ventureId").notNull().references(() => ventures.id),

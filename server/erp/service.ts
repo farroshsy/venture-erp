@@ -22,6 +22,7 @@ import {
   erpAssets,
   erpInventoryBalances,
   erpInventoryMovements,
+  erpItemMasterProfiles,
   erpJournalLines,
   erpJournalProposals,
   erpJournals,
@@ -144,6 +145,52 @@ export async function createMasterRecord(input: { ventureId: number; domain: Mas
 export async function listMasterRecords(ventureId: number, domain?: MasterDomain) {
   const db = await requireDb();
   return db.select().from(erpMasterRecords).where(domain ? and(eq(erpMasterRecords.ventureId, ventureId), eq(erpMasterRecords.domain, domain)) : eq(erpMasterRecords.ventureId, ventureId)).orderBy(desc(erpMasterRecords.updatedAt));
+}
+
+export type CanonicalItemType = "stock_item" | "non_stock_item" | "service";
+export type CanonicalItemCostingEligibility = "not_assessed" | "evidence_only_eligible" | "blocked";
+
+function normalizeCanonicalItemProfile(input: { itemType: CanonicalItemType; inventoryTracked: boolean; baseUomCode: string; unitEvidenceReference: string; productFamily?: string; costingEligibility: CanonicalItemCostingEligibility; attributes?: Record<string, unknown> }) {
+  const baseUomCode = input.baseUomCode.trim().toUpperCase();
+  const unitEvidenceReference = input.unitEvidenceReference.trim();
+  const productFamily = input.productFamily?.trim() || undefined;
+  if (!/^[A-Z0-9][A-Z0-9_-]{0,23}$/.test(baseUomCode)) throw new Error("Base unit code must be an explicit 1–24 character uppercase identifier; conversion is not implied.");
+  if (!unitEvidenceReference || unitEvidenceReference.length > 180) throw new Error("Canonical item profiles require a bounded declared-unit evidence reference.");
+  if (productFamily && productFamily.length > 96) throw new Error("Product family must be at most 96 characters when supplied.");
+  if (input.itemType === "stock_item" && !input.inventoryTracked) throw new Error("Stock-item profiles must explicitly declare inventory tracking.");
+  if (input.itemType === "service" && input.inventoryTracked) throw new Error("Service-item profiles cannot declare inventory tracking.");
+  return { itemType: input.itemType, inventoryTracked: input.inventoryTracked, baseUomCode, unitEvidenceReference, productFamily, costingEligibility: input.costingEligibility, attributes: input.attributes ?? {} };
+}
+
+export async function listCanonicalItemMasterProfiles(ventureId: number) {
+  const db = await requireDb();
+  return db.select({ profile: erpItemMasterProfiles, master: erpMasterRecords }).from(erpItemMasterProfiles).innerJoin(erpMasterRecords, eq(erpItemMasterProfiles.itemMasterId, erpMasterRecords.id)).where(and(eq(erpItemMasterProfiles.ventureId, ventureId), eq(erpMasterRecords.ventureId, ventureId))).orderBy(desc(erpItemMasterProfiles.updatedAt));
+}
+
+export async function createCanonicalItemMasterProfile(input: { ventureId: number; itemMasterId: number; itemType: CanonicalItemType; inventoryTracked: boolean; baseUomCode: string; unitEvidenceReference: string; productFamily?: string; costingEligibility: CanonicalItemCostingEligibility; attributes?: Record<string, unknown>; createdByUserId: number }) {
+  const db = await requireDb();
+  const [item] = await db.select().from(erpMasterRecords).where(and(eq(erpMasterRecords.id, input.itemMasterId), eq(erpMasterRecords.ventureId, input.ventureId))).limit(1);
+  if (!item || item.domain !== "item" || item.status !== "active") throw new Error("Canonical item profiles require an active item master in the active venture.");
+  const profile = normalizeCanonicalItemProfile(input);
+  const [existing] = await db.select().from(erpItemMasterProfiles).where(and(eq(erpItemMasterProfiles.ventureId, input.ventureId), eq(erpItemMasterProfiles.itemMasterId, input.itemMasterId))).limit(1);
+  if (existing) throw new Error("An immutable identity profile already exists for this item master; retire it under a separately governed future revision design rather than overwrite it.");
+  const result = await db.insert(erpItemMasterProfiles).values({ ventureId: input.ventureId, itemMasterId: item.id, ...profile, status: "draft", createdByUserId: input.createdByUserId });
+  const id = Number(result[0].insertId);
+  const boundary = { canonicalMasterOnly: true as const, noInventoryMovement: true as const, noBalanceMutation: true as const, noValuationCalculation: true as const, noCogsCalculation: true as const, noJournalCreated: true as const, noAutomaticPosting: true as const, noLedgerMutation: true as const, noTaxCalculation: true as const, noPayrollCalculation: true as const, noPaymentExecution: true as const, noFiling: true as const, noIntegrationTriggered: true as const, noExternalEffect: true as const };
+  await createAuditEvent({ ventureId: input.ventureId, domain: "inventory", eventType: "item_master_profile.created", actorUserId: input.createdByUserId, payload: { itemMasterProfileId: id, itemMasterId: item.id, itemType: profile.itemType, inventoryTracked: profile.inventoryTracked, baseUomCode: profile.baseUomCode, unitEvidenceReference: profile.unitEvidenceReference, costingEligibility: profile.costingEligibility, noUnitConversion: true, ...boundary } });
+  return { id, itemMasterId: item.id, ...profile, status: "draft" as const, boundary };
+}
+
+export async function activateCanonicalItemMasterProfile(input: { ventureId: number; itemMasterProfileId: number; actorUserId: number }) {
+  const db = await requireDb();
+  const [profile] = await db.select().from(erpItemMasterProfiles).where(and(eq(erpItemMasterProfiles.id, input.itemMasterProfileId), eq(erpItemMasterProfiles.ventureId, input.ventureId))).limit(1);
+  if (!profile) throw new Error("Canonical item-master profile was not found in the active venture.");
+  if (profile.status === "retired") throw new Error("Retired canonical item-master profiles cannot be reactivated.");
+  if (profile.status === "active") return { id: profile.id, status: "active" as const, idempotent: true as const, boundary: { canonicalMasterOnly: true as const, noInventoryMovement: true as const, noBalanceMutation: true as const, noValuationCalculation: true as const, noJournalCreated: true as const, noExternalEffect: true as const } };
+  await db.update(erpItemMasterProfiles).set({ status: "active", activatedByUserId: input.actorUserId, activatedAt: new Date() }).where(eq(erpItemMasterProfiles.id, profile.id));
+  const boundary = { canonicalMasterOnly: true as const, noInventoryMovement: true as const, noBalanceMutation: true as const, noValuationCalculation: true as const, noCogsCalculation: true as const, noJournalCreated: true as const, noAutomaticPosting: true as const, noLedgerMutation: true as const, noTaxCalculation: true as const, noPayrollCalculation: true as const, noPaymentExecution: true as const, noFiling: true as const, noIntegrationTriggered: true as const, noExternalEffect: true as const };
+  await createAuditEvent({ ventureId: input.ventureId, domain: "inventory", eventType: "item_master_profile.activated", actorUserId: input.actorUserId, payload: { itemMasterProfileId: profile.id, itemMasterId: profile.itemMasterId, baseUomCode: profile.baseUomCode, costingEligibility: profile.costingEligibility, noUnitConversion: true, ...boundary } });
+  return { id: profile.id, status: "active" as const, idempotent: false as const, boundary };
 }
 
 export async function createAccountingPeriod(input: { ventureId: number; code: string; name: string; startDate: string; endDate: string; createdByUserId: number }) {

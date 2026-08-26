@@ -6,6 +6,9 @@ vi.mock("../erp/service", () => ({
   getOperationalDashboard: vi.fn(),
   getAccessiblePortfolioDashboard: vi.fn(),
   listMasterRecords: vi.fn(),
+  listCanonicalItemMasterProfiles: vi.fn(),
+  createCanonicalItemMasterProfile: vi.fn(),
+  activateCanonicalItemMasterProfile: vi.fn(),
   createMasterRecord: vi.fn(),
   getVentureCurrencyPolicy: vi.fn(),
   setVentureReportingCurrency: vi.fn(),
@@ -130,6 +133,19 @@ describe("operational ERP router", () => {
     vi.mocked(service.listOperationalRecords).mockResolvedValue([]);
     await expect(caller().records.list({ ventureId: 21 })).resolves.toEqual([]);
     expect(requireVentureMembership).toHaveBeenCalledWith(7, 21);
+  });
+  it("keeps canonical item profiles tenant-scoped, finance-authorized, and free of inventory or financial effects", async () => {
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(service.listCanonicalItemMasterProfiles).mockResolvedValue([] as never);
+    await expect(caller().master.itemProfiles({ ventureId: 21 })).resolves.toEqual([]);
+    vi.mocked(service.createCanonicalItemMasterProfile).mockResolvedValue({ id: 189, itemMasterId: 88, itemType: "stock_item", inventoryTracked: true, baseUomCode: "EA", unitEvidenceReference: "ITEM-MASTER-EVIDENCE", costingEligibility: "not_assessed", status: "draft", boundary: { canonicalMasterOnly: true, noInventoryMovement: true, noValuationCalculation: true, noJournalCreated: true, noExternalEffect: true } } as never);
+    await expect(caller().master.createItemProfile({ ventureId: 21, itemMasterId: 88, itemType: "stock_item", inventoryTracked: true, baseUomCode: "EA", unitEvidenceReference: "ITEM-MASTER-EVIDENCE", costingEligibility: "not_assessed", attributes: {} })).resolves.toMatchObject({ id: 189, boundary: { canonicalMasterOnly: true, noInventoryMovement: true, noValuationCalculation: true, noJournalCreated: true, noExternalEffect: true } });
+    vi.mocked(service.activateCanonicalItemMasterProfile).mockResolvedValue({ id: 189, status: "active", idempotent: false, boundary: { canonicalMasterOnly: true, noInventoryMovement: true, noValuationCalculation: true, noJournalCreated: true, noExternalEffect: true } } as never);
+    await expect(caller().master.activateItemProfile({ ventureId: 21, itemMasterProfileId: 189 })).resolves.toMatchObject({ status: "active", boundary: { canonicalMasterOnly: true, noInventoryMovement: true, noValuationCalculation: true, noJournalCreated: true, noExternalEffect: true } });
+    expect(service.listCanonicalItemMasterProfiles).toHaveBeenCalledWith(21);
+    expect(service.createCanonicalItemMasterProfile).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, itemMasterId: 88, baseUomCode: "EA", createdByUserId: 7 }));
+    expect(service.activateCanonicalItemMasterProfile).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, itemMasterProfileId: 189, actorUserId: 7 }));
   });
   it("returns expanded real-record dashboard posture only inside the authorized venture", async () => {
     vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "viewer", status: "active", createdAt: new Date(), updatedAt: new Date() });
