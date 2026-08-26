@@ -622,6 +622,40 @@ export const erpCostingCalculationEvidence = mysqlTable("erp_costing_calculation
   index("erp_cost_calc_venture_type_idx").on(table.ventureId, table.calculationType, table.calculatedAt),
 ]);
 
+export const erpCostingCorrectionRequests = mysqlTable("erp_costing_correction_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  requestKey: varchar("requestKey", { length: 140 }).notNull(),
+  originalCostingCalculationEvidenceId: int("originalCostingCalculationEvidenceId").notNull().references(() => erpCostingCalculationEvidence.id),
+  originalCostLayerId: int("originalCostLayerId").references(() => erpCostLayers.id),
+  originalRecordHash: varchar("originalRecordHash", { length: 64 }).notNull(),
+  originalSourceHash: varchar("originalSourceHash", { length: 64 }),
+  correctionEvidenceReference: varchar("correctionEvidenceReference", { length: 180 }).notNull(),
+  rationale: varchar("rationale", { length: 255 }).notNull(),
+  readinessSnapshot: json("readinessSnapshot").notNull(),
+  requestSnapshot: json("requestSnapshot").notNull(),
+  requestedByUserId: int("requestedByUserId").notNull().references(() => users.id),
+  requestedAt: timestamp("requestedAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("erp_cost_corr_req_venture_key_unique").on(table.ventureId, table.requestKey),
+  index("erp_cost_corr_req_venture_evidence_idx").on(table.ventureId, table.originalCostingCalculationEvidenceId, table.requestedAt),
+]);
+
+export const erpCostingCorrectionReviewEvidence = mysqlTable("erp_costing_correction_review_evidence", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  correctionRequestId: int("correctionRequestId").notNull().references(() => erpCostingCorrectionRequests.id),
+  decision: mysqlEnum("decision", ["blocked", "rejected"]).notNull(),
+  reviewNote: varchar("reviewNote", { length: 255 }).notNull(),
+  reasonCodes: json("reasonCodes").notNull(),
+  readinessSnapshot: json("readinessSnapshot").notNull(),
+  reviewSnapshot: json("reviewSnapshot").notNull(),
+  reviewedByUserId: int("reviewedByUserId").notNull().references(() => users.id),
+  reviewedAt: timestamp("reviewedAt").defaultNow().notNull(),
+}, table => [
+  index("erp_cost_corr_review_venture_request_idx").on(table.ventureId, table.correctionRequestId, table.reviewedAt),
+]);
+
 export const erpWorkflowDefinitions = mysqlTable("erp_workflow_definitions", {
   id: int("id").autoincrement().primaryKey(),
   ventureId: int("ventureId").notNull().references(() => ventures.id),

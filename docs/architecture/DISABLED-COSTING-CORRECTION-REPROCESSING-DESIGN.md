@@ -1,8 +1,8 @@
 # Disabled Costing Engine Correction and Reprocessing Design
 
-> **Status: DESIGN ONLY — NOT IMPLEMENTED, NOT ENABLED, AND NOT AUTHORIZED TO CHANGE LAYERS, VALUATION, COGS, JOURNALS, OR BALANCES.**
+> **Status: Advanced source remediation, reprocessing, successor evidence, valuation consequence, COGS, journal, and balance behavior remains DESIGN ONLY — NOT IMPLEMENTED, NOT ENABLED, AND NOT AUTHORIZED.** The separately documented evidence-only correction request and blocked/rejected human-review control is now implemented; it cannot execute any of these deferred behaviors.
 >
-> Venture ERP currently has no correction request service, reprocessing command, database table, typed route, user-interface action, background worker, or integration for the Costing Engine. This document describes a future fail-closed control seam only. It must not be interpreted as authority to rewrite source facts, amend a cost layer, revise calculation evidence, restate valuation, calculate COGS, create a journal, post a journal, change a balance, transmit data, or affect an external system.
+> Venture ERP now has an append-only, tenant-scoped correction request and distinct-reviewer `blocked`/`rejected` evidence control, documented in `HUMAN-REVIEWED-CORRECTION-REQUEST-CONTROL-DESIGN.md`. It has no reprocessing command, successor evidence path, background worker, or integration. This document continues to describe the deferred fail-closed reprocessing seam only. Neither document authorizes rewriting source facts, amending a cost layer, revising calculation evidence, restating valuation, calculating COGS, creating/posting a journal, changing a balance, transmitting data, or affecting an external system.
 
 ## Purpose and current boundary
 
@@ -25,7 +25,7 @@ Future work must keep source correction, Costing Engine reprocessing, and any ev
 
 | Future concept | Intended meaning | Immutable relationship | Present availability |
 | --- | --- | --- | --- |
-| Correction request | A finance-controlled assertion that retained source or configuration evidence is inaccurate or incomplete | Points to an original record hash and retained defect rationale | Unavailable |
+| Correction request | A finance-controlled assertion that retained source or configuration evidence is inaccurate or incomplete | Points to an original record hash and retained defect rationale | Implemented as evidence-only request plus blocked/rejected review; no correction/reprocessing |
 | Source remediation evidence | Separately governed evidence for a new corrected business assertion | References, but never rewrites, the original source assertion | Unavailable |
 | Reprocessing request | A bounded request to recalculate specified Costing Engine evidence from verified immutable inputs | Captures the original evidence identifiers and expected hashes | Unavailable |
 | Reprocessed calculation evidence | A new append-only calculation result with a predecessor/supersession relationship | Coexists with the original result; never replaces it | Unavailable |

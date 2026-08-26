@@ -34,6 +34,9 @@ vi.mock("../erp/service", () => ({
   getControlledFinanceReporting: vi.fn(),
   getCanonicalFinancialObjectProjection: vi.fn(),
   getSemanticEvidenceGapReadiness: vi.fn(),
+  listCostingCorrectionControl: vi.fn(),
+  createCostingCorrectionRequest: vi.fn(),
+  reviewCostingCorrectionRequest: vi.fn(),
   reviewJournalProposal: vi.fn(),
   listAccountClassificationRevisions: vi.fn(),
   createAccountClassificationRevision: vi.fn(),
@@ -220,6 +223,12 @@ describe("operational ERP router", () => {
     await expect(caller().canonicalFinancialObjects.projection({ ventureId: 21 })).resolves.toMatchObject({ model: { name: "Canonical Financial Object Model" }, boundary: { readOnlyProjection: true, noJournalCreated: true, noExternalEffect: true } });
     vi.mocked(service.getSemanticEvidenceGapReadiness).mockResolvedValueOnce({ model: { name: "Semantic Evidence-Gap and Readiness Register" }, entries: [], graph: [], summary: { objectCount: 0, activationEligibleObjectCount: 0 }, boundary: { readOnlyRegister: true, noStateChange: true, noJournalCreated: true, noExternalEffect: true } } as never);
     await expect(caller().semanticReadiness.register({ ventureId: 21 })).resolves.toMatchObject({ model: { name: "Semantic Evidence-Gap and Readiness Register" }, summary: { activationEligibleObjectCount: 0 }, boundary: { readOnlyRegister: true, noStateChange: true, noJournalCreated: true, noExternalEffect: true } });
+    vi.mocked(service.listCostingCorrectionControl).mockResolvedValueOnce({ requests: [], boundary: { evidenceOnlyRequest: true, noSourceMutation: true, noReprocessingExecuted: true, noJournalCreated: true, noExternalEffect: true } } as never);
+    await expect(caller().costing.correctionControl({ ventureId: 21 })).resolves.toMatchObject({ boundary: { evidenceOnlyRequest: true, noSourceMutation: true, noReprocessingExecuted: true, noJournalCreated: true, noExternalEffect: true } });
+    vi.mocked(service.createCostingCorrectionRequest).mockResolvedValueOnce({ id: 710, requestKey: "CORR-710", idempotent: false, boundary: { evidenceOnlyRequest: true, noSourceMutation: true, noReprocessingExecuted: true, noJournalCreated: true, noExternalEffect: true } } as never);
+    await expect(caller().costing.createCorrectionRequest({ ventureId: 21, requestKey: "CORR-710", originalCostingCalculationEvidenceId: 701, originalRecordHash: "a".repeat(64), originalCostLayerId: 702, originalSourceHash: "b".repeat(64), correctionEvidenceReference: "IMMUTABLE-REMEDIATION-REFERENCE", rationale: "Bounded evidence-only correction assertion." })).resolves.toMatchObject({ id: 710, boundary: { evidenceOnlyRequest: true, noSourceMutation: true, noReprocessingExecuted: true, noJournalCreated: true, noExternalEffect: true } });
+    vi.mocked(service.reviewCostingCorrectionRequest).mockResolvedValueOnce({ id: 711, correctionRequestId: 710, decision: "blocked", reasonCodes: ["READINESS_REGISTER_HAS_NO_ACTIVATION_ELIGIBLE_OBJECT"], boundary: { evidenceOnlyRequest: true, noSourceMutation: true, noReprocessingExecuted: true, noJournalCreated: true, noExternalEffect: true } } as never);
+    await expect(caller().costing.reviewCorrectionRequest({ ventureId: 21, correctionRequestId: 710, decision: "blocked", reviewNote: "Blocked pending separate correction/reprocessing authorization." })).resolves.toMatchObject({ decision: "blocked", reasonCodes: ["READINESS_REGISTER_HAS_NO_ACTIVATION_ELIGIBLE_OBJECT"], boundary: { evidenceOnlyRequest: true, noSourceMutation: true, noReprocessingExecuted: true, noJournalCreated: true, noExternalEffect: true } });
     await expect(caller().accountingControl.reviewProposal({ ventureId: 21, journalProposalId: 92, decision: "approved", note: "Internal review only; no journal posting." })).resolves.toMatchObject({ noJournalCreated: true });
     expect(service.createPostingRuleRevision).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, eventType: "procurement_receipt", debitAllocations: [{ accountMasterId: 10, allocationBasisPoints: 6_000, narrative: "Inventory allocation" }, { accountMasterId: 12, allocationBasisPoints: 4_000, narrative: "Receiving allocation" }], createdByUserId: 7 }));
     expect(service.createAccountingCalculationEvidence).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, accountingEventId: 90, actorUserId: 7 }));
@@ -228,6 +237,9 @@ describe("operational ERP router", () => {
     expect(service.getControlledFinanceReporting).toHaveBeenCalledWith({ ventureId: 21, accountingPeriodId: 7, comparisonAccountingPeriodId: 6, accountMasterId: 10 });
     expect(service.getCanonicalFinancialObjectProjection).toHaveBeenCalledWith(21);
     expect(service.getSemanticEvidenceGapReadiness).toHaveBeenCalledWith(21);
+    expect(service.listCostingCorrectionControl).toHaveBeenCalledWith(21);
+    expect(service.createCostingCorrectionRequest).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, requestKey: "CORR-710", originalCostingCalculationEvidenceId: 701, originalCostLayerId: 702, requestedByUserId: 7 }));
+    expect(service.reviewCostingCorrectionRequest).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, correctionRequestId: 710, decision: "blocked", reviewedByUserId: 7 }));
     expect(service.reviewJournalProposal).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, journalProposalId: 92, decision: "approved", actorUserId: 7 }));
   });
   it("keeps configurable finance dimensions within the active venture and finance authorization", async () => {

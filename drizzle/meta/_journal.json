@@ -169,6 +169,13 @@
       "when": 1787706536511,
       "tag": "0023_bitter_valkyrie",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1787711654284,
+      "tag": "0024_robust_natasha_romanoff",
+      "breakpoints": true
     }
   ]
 }

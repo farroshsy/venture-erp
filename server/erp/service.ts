@@ -10,6 +10,8 @@ import {
   erpBudgetNodes,
   erpCompensationComponents,
   erpCostingCalculationEvidence,
+  erpCostingCorrectionRequests,
+  erpCostingCorrectionReviewEvidence,
   erpCostingPolicyRevisions,
   erpCostLayers,
   erpCrmOpportunities,
@@ -953,6 +955,80 @@ export async function getSemanticEvidenceGapReadiness(ventureId: number) {
     { from: "journal_proposal", to: "future_journal", state: "blocked", detail: "Proposal-to-journal conversion and posting remain separately disabled/governed." },
   ] as const;
   return { model: { name: "Semantic Evidence-Gap and Readiness Register", version: "0.1-read-only", posture: "descriptive_governance_not_activation" }, entries, graph, summary: { objectCount: entries.length, evidenceObservedCount: entries.filter(entry => entry.availableEvidence.length > 0).length, blockedObjectCount: entries.filter(entry => entry.blockers.length > 0).length, activationEligibleObjectCount: 0 }, boundary: { readOnlyRegister: true as const, noStateChange: true as const, noValuationPosting: true as const, noJournalCreated: true as const, noAutomaticPosting: true as const, noLedgerMutation: true as const, noBalanceMutation: true as const, noTaxCalculation: true as const, noPayrollCalculation: true as const, noPaymentExecution: true as const, noFiling: true as const, noIntegrationTriggered: true as const, noExternalEffect: true as const } };
+}
+
+const correctionBoundary = { evidenceOnlyRequest: true as const, noSourceMutation: true as const, noLayerMutation: true as const, noReprocessingExecuted: true as const, noValuationPosting: true as const, noCogsCalculation: true as const, noJournalCreated: true as const, noAutomaticPosting: true as const, noLedgerMutation: true as const, noBalanceMutation: true as const, noTaxCalculation: true as const, noPayrollCalculation: true as const, noPaymentExecution: true as const, noFiling: true as const, noIntegrationTriggered: true as const, noExternalEffect: true as const };
+
+function correctionReasonCodes(readiness: Awaited<ReturnType<typeof getSemanticEvidenceGapReadiness>>) {
+  const valuation = readiness.entries.find(entry => entry.object === "valuation_layer");
+  const journal = readiness.entries.find(entry => entry.object === "future_journal");
+  return [
+    "NO_CORRECTION_REPROCESSING_POLICY",
+    "NO_SOURCE_REMEDIATION_CONTRACT",
+    "NO_SUCCESSOR_EVIDENCE_AUTHORIZATION",
+    ...(readiness.summary.activationEligibleObjectCount === 0 ? ["READINESS_REGISTER_HAS_NO_ACTIVATION_ELIGIBLE_OBJECT"] : []),
+    ...(valuation?.dimensions.accountingReadiness === "blocked" ? ["VALUATION_FINANCIAL_EFFECT_BLOCKED"] : []),
+    ...(journal?.dimensions.postingReadiness === "disabled" ? ["POSTING_READINESS_DISABLED"] : []),
+  ];
+}
+
+export async function listCostingCorrectionControl(ventureId: number) {
+  const db = await requireDb();
+  const [requests, reviews] = await Promise.all([
+    db.select().from(erpCostingCorrectionRequests).where(eq(erpCostingCorrectionRequests.ventureId, ventureId)).orderBy(desc(erpCostingCorrectionRequests.requestedAt)),
+    db.select().from(erpCostingCorrectionReviewEvidence).where(eq(erpCostingCorrectionReviewEvidence.ventureId, ventureId)).orderBy(desc(erpCostingCorrectionReviewEvidence.reviewedAt)),
+  ]);
+  return { requests: requests.map(request => ({ ...request, reviews: reviews.filter(review => review.correctionRequestId === request.id) })), boundary: correctionBoundary };
+}
+
+export async function createCostingCorrectionRequest(input: { ventureId: number; requestKey: string; originalCostingCalculationEvidenceId: number; originalRecordHash: string; originalCostLayerId?: number; originalSourceHash?: string; correctionEvidenceReference: string; rationale: string; requestedByUserId: number }) {
+  const db = await requireDb();
+  const requestKey = input.requestKey.trim();
+  if (!requestKey || !input.correctionEvidenceReference.trim() || !input.rationale.trim()) throw new Error("Correction requests require a request key, immutable evidence reference, and bounded rationale.");
+  const [original] = await db.select().from(erpCostingCalculationEvidence).where(and(eq(erpCostingCalculationEvidence.id, input.originalCostingCalculationEvidenceId), eq(erpCostingCalculationEvidence.ventureId, input.ventureId))).limit(1);
+  if (!original) throw new Error("Original Costing Engine calculation evidence was not found in the active venture.");
+  if (original.recordHash !== input.originalRecordHash.trim()) throw new Error("Correction requests require the exact retained original calculation record hash.");
+  const originalInput = original.inputSnapshot as { eligibleLayerEvidence?: Array<{ id?: number }> };
+  const originalOutput = original.calculationSnapshot as { result?: { sourceLayerEvidence?: Array<{ costLayerId?: number }>; lines?: Array<{ costLayerId?: number }> } };
+  const immutableReferencedLayerIds = new Set([original.costLayerId, ...(originalInput.eligibleLayerEvidence ?? []).map(layer => layer.id), ...(originalOutput.result?.sourceLayerEvidence ?? []).map(layer => layer.costLayerId), ...(originalOutput.result?.lines ?? []).map(line => line.costLayerId)].filter((id): id is number => typeof id === "number"));
+  if (input.originalCostLayerId && !immutableReferencedLayerIds.has(input.originalCostLayerId)) throw new Error("Correction request layer target does not match the immutable original calculation evidence.");
+  const layerId = input.originalCostLayerId ?? original.costLayerId ?? undefined;
+  let layer: typeof erpCostLayers.$inferSelect | undefined;
+  if (layerId) {
+    [layer] = await db.select().from(erpCostLayers).where(and(eq(erpCostLayers.id, layerId), eq(erpCostLayers.ventureId, input.ventureId))).limit(1);
+    if (!layer) throw new Error("Original Costing Engine layer was not found in the active venture.");
+    if (input.originalSourceHash?.trim() && layer.sourceHash !== input.originalSourceHash.trim()) throw new Error("Correction requests require the exact retained original source hash when it is supplied.");
+  } else if (input.originalSourceHash?.trim()) throw new Error("An original source hash may be supplied only for an immutable layer linked to the original calculation evidence.");
+  const [existing] = await db.select().from(erpCostingCorrectionRequests).where(and(eq(erpCostingCorrectionRequests.ventureId, input.ventureId), eq(erpCostingCorrectionRequests.requestKey, requestKey))).limit(1);
+  if (existing) {
+    if (existing.originalCostingCalculationEvidenceId !== original.id || existing.originalRecordHash !== original.recordHash) throw new Error("Correction request key already belongs to a different immutable target.");
+    return { id: existing.id, requestKey: existing.requestKey, idempotent: true as const, boundary: correctionBoundary };
+  }
+  const readiness = await getSemanticEvidenceGapReadiness(input.ventureId);
+  const requestSnapshot = { originalCalculationEvidenceId: original.id, calculationKey: original.calculationKey, calculationType: original.calculationType, originalRecordHash: original.recordHash, originalSourceHash: layer?.sourceHash ?? null, originalCostLayerId: layer?.id ?? null, correctionEvidenceReference: input.correctionEvidenceReference.trim(), rationale: input.rationale.trim(), requestMode: "evidence_only_human_review_required", noReplacementDataAccepted: true, ...correctionBoundary };
+  const result = await db.insert(erpCostingCorrectionRequests).values({ ventureId: input.ventureId, requestKey, originalCostingCalculationEvidenceId: original.id, originalCostLayerId: layer?.id ?? null, originalRecordHash: original.recordHash, originalSourceHash: layer?.sourceHash ?? null, correctionEvidenceReference: input.correctionEvidenceReference.trim(), rationale: input.rationale.trim(), readinessSnapshot: readiness, requestSnapshot, requestedByUserId: input.requestedByUserId });
+  const id = Number(result[0].insertId);
+  await createAuditEvent({ ventureId: input.ventureId, domain: "costing", eventType: "costing_correction.requested", actorUserId: input.requestedByUserId, payload: { correctionRequestId: id, requestKey, originalCostingCalculationEvidenceId: original.id, originalCostLayerId: layer?.id ?? null, noReplacementDataAccepted: true, ...correctionBoundary } });
+  return { id, requestKey, idempotent: false as const, readinessSummary: readiness.summary, boundary: correctionBoundary };
+}
+
+export async function reviewCostingCorrectionRequest(input: { ventureId: number; correctionRequestId: number; decision: "blocked" | "rejected"; reviewNote: string; reviewedByUserId: number }) {
+  const db = await requireDb();
+  if (!input.reviewNote.trim()) throw new Error("Correction request review requires a bounded review note.");
+  const [request] = await db.select().from(erpCostingCorrectionRequests).where(and(eq(erpCostingCorrectionRequests.id, input.correctionRequestId), eq(erpCostingCorrectionRequests.ventureId, input.ventureId))).limit(1);
+  if (!request) throw new Error("Correction request was not found in the active venture.");
+  if (request.requestedByUserId === input.reviewedByUserId) throw new Error("Correction request reviewer must be distinct from the requesting user.");
+  const [existingReview] = await db.select().from(erpCostingCorrectionReviewEvidence).where(and(eq(erpCostingCorrectionReviewEvidence.ventureId, input.ventureId), eq(erpCostingCorrectionReviewEvidence.correctionRequestId, request.id))).limit(1);
+  if (existingReview) throw new Error("Correction request already has immutable review evidence.");
+  const [original] = await db.select().from(erpCostingCalculationEvidence).where(and(eq(erpCostingCalculationEvidence.id, request.originalCostingCalculationEvidenceId), eq(erpCostingCalculationEvidence.ventureId, input.ventureId))).limit(1);
+  if (!original || original.recordHash !== request.originalRecordHash) throw new Error("Correction review cannot proceed because the original immutable calculation identity no longer verifies.");
+  const readiness = await getSemanticEvidenceGapReadiness(input.ventureId);
+  const reasonCodes = correctionReasonCodes(readiness);
+  const reviewSnapshot = { correctionRequestId: request.id, requestKey: request.requestKey, originalCostingCalculationEvidenceId: original.id, originalRecordHash: original.recordHash, decision: input.decision, reviewMode: "human_review_only_no_reprocessing", reasonCodes, noSuccessorEvidenceCreated: true, ...correctionBoundary };
+  const result = await db.insert(erpCostingCorrectionReviewEvidence).values({ ventureId: input.ventureId, correctionRequestId: request.id, decision: input.decision, reviewNote: input.reviewNote.trim(), reasonCodes, readinessSnapshot: readiness, reviewSnapshot, reviewedByUserId: input.reviewedByUserId });
+  const id = Number(result[0].insertId);
+  await createAuditEvent({ ventureId: input.ventureId, domain: "costing", eventType: `costing_correction.review_${input.decision}`, actorUserId: input.reviewedByUserId, payload: { correctionReviewEvidenceId: id, correctionRequestId: request.id, reasonCodes, noSuccessorEvidenceCreated: true, ...correctionBoundary } });
+  return { id, correctionRequestId: request.id, decision: input.decision, reasonCodes, readinessSummary: readiness.summary, boundary: correctionBoundary };
 }
 
 export async function createFinanceDimensionDefinition(input: { ventureId: number; code: string; name: string; description?: string; requiredForProposal?: boolean; createdByUserId: number }) {
