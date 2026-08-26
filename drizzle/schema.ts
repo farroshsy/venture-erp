@@ -197,6 +197,27 @@ export const erpItemMasterProfiles = mysqlTable("erp_item_master_profiles", {
   index("erp_item_profile_venture_status_idx").on(table.ventureId, table.status),
 ]);
 
+export const erpSupplierMasterProfiles = mysqlTable("erp_supplier_master_profiles", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  supplierMasterId: int("supplierMasterId").notNull().references(() => erpMasterRecords.id),
+  counterpartyType: mysqlEnum("counterpartyType", ["organization", "individual", "public_entity", "intercompany"]).notNull(),
+  procurementScope: mysqlEnum("procurementScope", ["goods", "services", "mixed"]).notNull(),
+  identityEvidenceReference: varchar("identityEvidenceReference", { length: 180 }).notNull(),
+  procurementEvidenceReference: varchar("procurementEvidenceReference", { length: 180 }).notNull(),
+  onboardingEligibility: mysqlEnum("onboardingEligibility", ["not_assessed", "evidence_only_eligible", "blocked"]).default("not_assessed").notNull(),
+  status: mysqlEnum("status", ["draft", "active", "retired"]).default("draft").notNull(),
+  attributes: json("attributes").notNull(),
+  createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+  activatedByUserId: int("activatedByUserId").references(() => users.id),
+  activatedAt: timestamp("activatedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("erp_supplier_profile_venture_master_unique").on(table.ventureId, table.supplierMasterId),
+  index("erp_supplier_profile_venture_status_idx").on(table.ventureId, table.status),
+]);
+
 export const erpEmployeeProfiles = mysqlTable("erp_employee_profiles", {
   id: int("id").autoincrement().primaryKey(),
   ventureId: int("ventureId").notNull().references(() => ventures.id),
