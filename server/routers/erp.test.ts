@@ -268,7 +268,7 @@ describe("operational ERP router", () => {
     vi.mocked(requireVentureRole).mockReset();
     vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "operator", status: "active", createdAt: new Date(), updatedAt: new Date() });
     vi.mocked(service.receivePurchaseOrder).mockResolvedValue({ purchaseOrderRecordId: 17, inventoryMovementId: 45, status: "fulfilled", finalReceipt: true } as never);
-    const sourceFacts = { internalReceiptReference: "VALIDATION-GRN-001", warehouseCode: "WH-JKT-01", costCenterCode: "OPS-001", projectCode: "PROJ-001", supplierDeliveryReference: "SUP-DEL-001", evidenceReference: "VALIDATION-EVIDENCE-001" };
+    const sourceFacts = { internalReceiptReference: "VALIDATION-GRN-001", warehouseCode: "WH-JKT-01", costCenterCode: "OPS-001", profitCenterCode: "PC-001", internalOrderCode: "IO-001", projectCode: "PROJ-001", supplierDeliveryReference: "SUP-DEL-001", evidenceReference: "VALIDATION-EVIDENCE-001" };
     await expect(caller().inventory.receivePurchaseOrder({ ventureId: 21, purchaseOrderRecordId: 17, itemMasterId: 13, quantity: 2, narrative: "Final receipt", sourceFacts, finalReceipt: true })).resolves.toMatchObject({ status: "fulfilled", finalReceipt: true });
     expect(service.receivePurchaseOrder).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, purchaseOrderRecordId: 17, itemMasterId: 13, sourceFacts, actorUserId: 7, finalReceipt: true }));
   });

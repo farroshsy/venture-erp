@@ -42,7 +42,7 @@ import { availableBudget, calculateTax, canTransition, convertCurrency, normaliz
 export type MasterDomain = "customer" | "supplier" | "item" | "employee" | "account" | "project" | "asset" | "location" | "compensation_component" | "tax_category";
 export type OperationalDomain = "finance" | "sales" | "procurement" | "inventory" | "people" | "payroll" | "projects" | "assets" | "service" | "crm";
 export type PostingRuleLine = { entrySide: "debit" | "credit"; accountMasterId: number; narrative: string; allocationBasisPoints?: number };
-export type ProcurementReceiptSourceFacts = { internalReceiptReference?: string; warehouseCode?: string; costCenterCode?: string; projectCode?: string; supplierDeliveryReference?: string; evidenceReference?: string };
+export type ProcurementReceiptSourceFacts = { internalReceiptReference?: string; warehouseCode?: string; costCenterCode?: string; profitCenterCode?: string; internalOrderCode?: string; projectCode?: string; supplierDeliveryReference?: string; evidenceReference?: string };
 export type SalesFulfillmentSourceFacts = { internalFulfillmentReference?: string; warehouseCode?: string; costCenterCode?: string; projectCode?: string; customerDeliveryReference?: string; evidenceReference?: string };
 export type AccountClassificationFamily = "asset" | "liability" | "equity" | "revenue" | "expense" | "memo";
 export type AccountStatementSection = "current_assets" | "noncurrent_assets" | "current_liabilities" | "noncurrent_liabilities" | "equity" | "operating_revenue" | "other_income" | "operating_expense" | "other_expense" | "memo";
@@ -64,7 +64,7 @@ function validateAccountClassification(input: { classificationFamily: AccountCla
 
 function normalizeProcurementReceiptSourceFacts(sourceFacts?: ProcurementReceiptSourceFacts) {
   if (!sourceFacts) return undefined;
-  const fields: Array<[keyof ProcurementReceiptSourceFacts, number]> = [["internalReceiptReference", 96], ["warehouseCode", 96], ["costCenterCode", 96], ["projectCode", 96], ["supplierDeliveryReference", 160], ["evidenceReference", 180]];
+  const fields: Array<[keyof ProcurementReceiptSourceFacts, number]> = [["internalReceiptReference", 96], ["warehouseCode", 96], ["costCenterCode", 96], ["profitCenterCode", 96], ["internalOrderCode", 96], ["projectCode", 96], ["supplierDeliveryReference", 160], ["evidenceReference", 180]];
   const normalized: ProcurementReceiptSourceFacts = {};
   for (const [field, maxLength] of fields) {
     const value = sourceFacts[field];
