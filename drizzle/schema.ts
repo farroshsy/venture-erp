@@ -520,6 +520,7 @@ export const erpInventoryMovements = mysqlTable("erp_inventory_movements", {
   onHandAfter: decimal("onHandAfter", { precision: 18, scale: 3 }).notNull(),
   reservedAfter: decimal("reservedAfter", { precision: 18, scale: 3 }).notNull(),
   narrative: varchar("narrative", { length: 255 }).notNull(),
+  sourceFacts: json("sourceFacts"),
   createdByUserId: int("createdByUserId").notNull().references(() => users.id),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, table => [

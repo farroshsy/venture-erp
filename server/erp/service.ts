@@ -41,6 +41,21 @@ import { availableBudget, calculateTax, canTransition, convertCurrency, normaliz
 export type MasterDomain = "customer" | "supplier" | "item" | "employee" | "account" | "project" | "asset" | "location" | "compensation_component" | "tax_category";
 export type OperationalDomain = "finance" | "sales" | "procurement" | "inventory" | "people" | "payroll" | "projects" | "assets" | "service" | "crm";
 export type PostingRuleLine = { entrySide: "debit" | "credit"; accountMasterId: number; narrative: string; allocationBasisPoints?: number };
+export type ProcurementReceiptSourceFacts = { internalReceiptReference?: string; warehouseCode?: string; costCenterCode?: string; projectCode?: string; supplierDeliveryReference?: string; evidenceReference?: string };
+
+function normalizeProcurementReceiptSourceFacts(sourceFacts?: ProcurementReceiptSourceFacts) {
+  if (!sourceFacts) return undefined;
+  const fields: Array<[keyof ProcurementReceiptSourceFacts, number]> = [["internalReceiptReference", 96], ["warehouseCode", 96], ["costCenterCode", 96], ["projectCode", 96], ["supplierDeliveryReference", 160], ["evidenceReference", 180]];
+  const normalized: ProcurementReceiptSourceFacts = {};
+  for (const [field, maxLength] of fields) {
+    const value = sourceFacts[field];
+    if (value === undefined) continue;
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.length > maxLength) throw new Error(`${field} must be non-empty and at most ${maxLength} characters when supplied.`);
+    normalized[field] = trimmed;
+  }
+  return Object.keys(normalized).length ? normalized : undefined;
+}
 
 async function requireDb() {
   const db = await getDb();
@@ -531,9 +546,10 @@ export async function emitProcurementReceiptAccountingEvent(input: { ventureId: 
   const eventKey = `PROC-RECEIPT-${movement.id}`;
   const [existing] = await db.select().from(erpAccountingEvents).where(and(eq(erpAccountingEvents.ventureId, input.ventureId), eq(erpAccountingEvents.eventKey, eventKey))).limit(1);
   if (existing) return { ...existing, idempotent: true as const };
-  const result = await db.insert(erpAccountingEvents).values({ ventureId: input.ventureId, eventKey, eventType: "procurement_receipt", sourceDomain: "procurement", sourceOperationalRecordId: purchaseOrder.id, sourceInventoryMovementId: movement.id, accountingPeriodId: purchaseOrder.accountingPeriodId, accountingDate: purchaseOrder.effectiveDate, transactionCurrency: purchaseOrder.transactionCurrency, functionalCurrency: purchaseOrder.functionalCurrency, amount: String(normalizeMoney(Number(purchaseOrder.totalAmount))), functionalAmount: String(normalizeMoney(Number(purchaseOrder.functionalAmount))), sourceSnapshot: { recordNumber: purchaseOrder.recordNumber, status: purchaseOrder.status, totalAmount: purchaseOrder.totalAmount, functionalAmount: purchaseOrder.functionalAmount, receiptQuantity: movement.quantity, receiptNarrative: movement.narrative }, dimensionsSnapshot: { sourceModule: "procurement", sourceOperationalRecordId: purchaseOrder.id, sourceInventoryMovementId: movement.id, supplierMasterId: purchaseOrder.counterpartyMasterId ?? null, itemMasterId: movement.itemMasterId, warehouse: null, project: null }, evidenceSnapshot: { inventoryMovementId: movement.id, noTaxDetermination: true, noPaymentExecution: true, noExternalEffect: true }, emittedByUserId: input.actorUserId });
+  const receiptSourceFacts = (movement.sourceFacts ?? {}) as ProcurementReceiptSourceFacts;
+  const result = await db.insert(erpAccountingEvents).values({ ventureId: input.ventureId, eventKey, eventType: "procurement_receipt", sourceDomain: "procurement", sourceOperationalRecordId: purchaseOrder.id, sourceInventoryMovementId: movement.id, accountingPeriodId: purchaseOrder.accountingPeriodId, accountingDate: purchaseOrder.effectiveDate, transactionCurrency: purchaseOrder.transactionCurrency, functionalCurrency: purchaseOrder.functionalCurrency, amount: String(normalizeMoney(Number(purchaseOrder.totalAmount))), functionalAmount: String(normalizeMoney(Number(purchaseOrder.functionalAmount))), sourceSnapshot: { recordNumber: purchaseOrder.recordNumber, status: purchaseOrder.status, totalAmount: purchaseOrder.totalAmount, functionalAmount: purchaseOrder.functionalAmount, receiptQuantity: movement.quantity, receiptNarrative: movement.narrative, receiptSourceFacts }, dimensionsSnapshot: { sourceModule: "procurement", sourceOperationalRecordId: purchaseOrder.id, sourceInventoryMovementId: movement.id, supplierMasterId: purchaseOrder.counterpartyMasterId ?? null, itemMasterId: movement.itemMasterId, warehouse: receiptSourceFacts.warehouseCode ?? null, project: receiptSourceFacts.projectCode ?? null, costCenter: receiptSourceFacts.costCenterCode ?? null, WAREHOUSE: receiptSourceFacts.warehouseCode ?? null, PROJECT: receiptSourceFacts.projectCode ?? null, COST_CENTER: receiptSourceFacts.costCenterCode ?? null }, evidenceSnapshot: { inventoryMovementId: movement.id, internalReceiptReference: receiptSourceFacts.internalReceiptReference ?? null, supplierDeliveryReference: receiptSourceFacts.supplierDeliveryReference ?? null, evidenceReference: receiptSourceFacts.evidenceReference ?? null, noTaxDetermination: true, noPaymentExecution: true, noExternalEffect: true }, emittedByUserId: input.actorUserId });
   const id = Number(result[0].insertId);
-  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", operationalRecordId: purchaseOrder.id, eventType: "accounting_event.procurement_receipt_emitted", actorUserId: input.actorUserId, payload: { accountingEventId: id, eventKey, inventoryMovementId: movement.id, noAutomaticJournalPosting: true, noTaxDetermination: true, noPaymentExecution: true, noExternalEffect: true } });
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", operationalRecordId: purchaseOrder.id, eventType: "accounting_event.procurement_receipt_emitted", actorUserId: input.actorUserId, payload: { accountingEventId: id, eventKey, inventoryMovementId: movement.id, capturedSourceFactKeys: Object.keys(receiptSourceFacts), noAutomaticJournalPosting: true, noTaxDetermination: true, noPaymentExecution: true, noExternalEffect: true } });
   return { id, eventKey, eventType: "procurement_receipt" as const, idempotent: false as const };
 }
 
@@ -823,7 +839,7 @@ export async function listInventoryMovements(ventureId: number, itemMasterId?: n
   return db.select().from(erpInventoryMovements).where(itemMasterId ? and(eq(erpInventoryMovements.ventureId, ventureId), eq(erpInventoryMovements.itemMasterId, itemMasterId)) : eq(erpInventoryMovements.ventureId, ventureId)).orderBy(desc(erpInventoryMovements.createdAt));
 }
 
-export async function recordInventoryMovement(input: { ventureId: number; itemMasterId: number; operationalRecordId?: number; movementType: InventoryMovementType; quantity: number; narrative: string; createdByUserId: number }) {
+export async function recordInventoryMovement(input: { ventureId: number; itemMasterId: number; operationalRecordId?: number; movementType: InventoryMovementType; quantity: number; narrative: string; sourceFacts?: Record<string, unknown>; createdByUserId: number }) {
   const db = await requireDb();
   const quantity = Math.round(input.quantity * 1000) / 1000;
   if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Inventory quantity must be greater than zero.");
@@ -851,26 +867,27 @@ export async function recordInventoryMovement(input: { ventureId: number; itemMa
     if (nextOnHand < 0 || nextReserved < 0 || nextReserved > nextOnHand) throw new Error("Inventory balance invariant failed.");
     if (current) await tx.update(erpInventoryBalances).set({ onHandQuantity: String(nextOnHand), reservedQuantity: String(nextReserved) }).where(eq(erpInventoryBalances.id, current.id));
     else await tx.insert(erpInventoryBalances).values({ ventureId: input.ventureId, itemMasterId: input.itemMasterId, onHandQuantity: String(nextOnHand), reservedQuantity: String(nextReserved) });
-    const result = await tx.insert(erpInventoryMovements).values({ ventureId: input.ventureId, itemMasterId: input.itemMasterId, operationalRecordId: input.operationalRecordId, movementType: input.movementType, quantity: String(quantity), onHandAfter: String(nextOnHand), reservedAfter: String(nextReserved), narrative: input.narrative, createdByUserId: input.createdByUserId });
+    const result = await tx.insert(erpInventoryMovements).values({ ventureId: input.ventureId, itemMasterId: input.itemMasterId, operationalRecordId: input.operationalRecordId, movementType: input.movementType, quantity: String(quantity), onHandAfter: String(nextOnHand), reservedAfter: String(nextReserved), narrative: input.narrative, sourceFacts: input.sourceFacts ?? null, createdByUserId: input.createdByUserId });
     return { id: Number(result[0].insertId), onHandQuantity: nextOnHand, reservedQuantity: nextReserved, availableQuantity: Math.round((nextOnHand - nextReserved) * 1000) / 1000 };
   });
-  await createAuditEvent({ ventureId: input.ventureId, domain: "inventory", eventType: "inventory.movement_recorded", actorUserId: input.createdByUserId, payload: { movementId: outcome.id, itemMasterId: input.itemMasterId, movementType: input.movementType, quantity, onHandAfter: outcome.onHandQuantity, reservedAfter: outcome.reservedQuantity } });
+  await createAuditEvent({ ventureId: input.ventureId, domain: "inventory", eventType: "inventory.movement_recorded", actorUserId: input.createdByUserId, payload: { movementId: outcome.id, itemMasterId: input.itemMasterId, movementType: input.movementType, quantity, onHandAfter: outcome.onHandQuantity, reservedAfter: outcome.reservedQuantity, capturedSourceFactKeys: Object.keys(input.sourceFacts ?? {}) } });
   return { ...input, quantity, ...outcome };
 }
 
-export async function receivePurchaseOrder(input: { ventureId: number; purchaseOrderRecordId: number; itemMasterId: number; quantity: number; narrative: string; finalReceipt?: boolean; actorUserId: number }) {
+export async function receivePurchaseOrder(input: { ventureId: number; purchaseOrderRecordId: number; itemMasterId: number; quantity: number; narrative: string; sourceFacts?: ProcurementReceiptSourceFacts; finalReceipt?: boolean; actorUserId: number }) {
   const db = await requireDb();
   const rows = await db.select().from(erpOperationalRecords).where(and(eq(erpOperationalRecords.id, input.purchaseOrderRecordId), eq(erpOperationalRecords.ventureId, input.ventureId))).limit(1);
   const purchaseOrder = rows[0];
   if (!purchaseOrder || purchaseOrder.domain !== "procurement" || purchaseOrder.recordType !== "purchase_order") throw new Error("Approved purchase order not found in the active venture.");
   if (!["approved", "posted"].includes(purchaseOrder.status)) throw new Error("Purchase orders must be approved or posted before receipt.");
-  const receipt = await recordInventoryMovement({ ventureId: input.ventureId, itemMasterId: input.itemMasterId, operationalRecordId: purchaseOrder.id, movementType: "receipt", quantity: input.quantity, narrative: input.narrative, createdByUserId: input.actorUserId });
+  const sourceFacts = normalizeProcurementReceiptSourceFacts(input.sourceFacts);
+  const receipt = await recordInventoryMovement({ ventureId: input.ventureId, itemMasterId: input.itemMasterId, operationalRecordId: purchaseOrder.id, movementType: "receipt", quantity: input.quantity, narrative: input.narrative, sourceFacts, createdByUserId: input.actorUserId });
   let status = purchaseOrder.status;
   if (input.finalReceipt) {
     status = "fulfilled";
     await db.update(erpOperationalRecords).set({ status, updatedAt: new Date() }).where(eq(erpOperationalRecords.id, purchaseOrder.id));
   }
-  await createAuditEvent({ ventureId: input.ventureId, domain: "procurement", operationalRecordId: purchaseOrder.id, eventType: "purchase_order.received", actorUserId: input.actorUserId, payload: { itemMasterId: input.itemMasterId, quantity: receipt.quantity, inventoryMovementId: receipt.id, finalReceipt: Boolean(input.finalReceipt), resultingStatus: status } });
+  await createAuditEvent({ ventureId: input.ventureId, domain: "procurement", operationalRecordId: purchaseOrder.id, eventType: "purchase_order.received", actorUserId: input.actorUserId, payload: { itemMasterId: input.itemMasterId, quantity: receipt.quantity, inventoryMovementId: receipt.id, finalReceipt: Boolean(input.finalReceipt), capturedSourceFactKeys: Object.keys(sourceFacts ?? {}), resultingStatus: status, noValuationCalculation: true, noTaxCalculation: true, noExternalEffect: true } });
   const accountingControl = input.finalReceipt
     ? await emitProcurementReceiptAccountingEvent({ ventureId: input.ventureId, purchaseOrderRecordId: purchaseOrder.id, inventoryMovementId: receipt.id, actorUserId: input.actorUserId })
     : undefined;
