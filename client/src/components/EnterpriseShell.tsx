@@ -3,11 +3,12 @@ import { startLogin } from "@/const";
 import { useVenture } from "@/contexts/VentureContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArrowRightLeft, Boxes, BriefcaseBusiness, ChevronDown, Factory, FileSearch, GitBranch, Globe2, Grid2X2, KeyRound, Landmark, LayoutDashboard, LogOut, MessageSquareText, Network, PanelLeftClose, PanelLeftOpen, Scale, ScrollText, ShieldCheck, ShoppingCart, Users, Workflow } from "lucide-react";
+import { ArrowRightLeft, BookOpenCheck, Boxes, BriefcaseBusiness, ChevronDown, Factory, FileSearch, GitBranch, Globe2, Grid2X2, KeyRound, Landmark, LayoutDashboard, LogOut, MessageSquareText, Network, PanelLeftClose, PanelLeftOpen, Scale, ScrollText, ShieldCheck, ShoppingCart, Users, Workflow } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
 const navigation = [
+  { path: "/guide", label: "Workspace guide", icon: BookOpenCheck },
   { path: "/", label: "Portfolio", icon: Grid2X2 },
   { path: "/executive", label: "Executive architecture", icon: LayoutDashboard },
   { path: "/governance", label: "Architecture governance", icon: ScrollText },

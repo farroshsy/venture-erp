@@ -150,3 +150,6 @@
 - [x] Design a disabled sales-fulfillment accounting-event seam that retains source-fact/evidence prerequisites and refuses revenue or COGS effects until separately governed.
 - [x] Capture attributable asset-acquisition source facts in the tenant-scoped asset register with no capitalization, depreciation, valuation, posting, or external effect.
 - [x] Design a disabled asset-accounting event seam that retains acquisition source-fact/evidence prerequisites and refuses capitalization, depreciation, or valuation effects until separately governed.
+- [x] Preserve the supplied enterprise-finance research roadmap in versioned project documentation, including its priorities, long-term architecture, and explicit governance/dependency caveats.
+- [x] Update the repository README with the governed research roadmap, implementation posture, developer workflow, and safe operating boundaries.
+- [x] Add an in-product help guide that explains how to navigate and use the venture-scoped control workspace without implying unenabled financial, regulatory, or payroll behavior.

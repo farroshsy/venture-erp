@@ -91,6 +91,18 @@ infra/                    # Infrastructure-as-code direction and deployment expe
 scripts/                  # Contract and foundation verification
 ```
 
+## Enterprise finance research roadmap
+
+The user-supplied institutional-finance roadmap is preserved in [`docs/research/ENTERPRISE-FINANCE-AND-OPERATIONS-ROADMAP.md`](docs/research/ENTERPRISE-FINANCE-AND-OPERATIONS-ROADMAP.md). It prioritizes governed inventory valuation/cost accounting, deterministic COGS/margins, fixed assets, treasury, an Investment Book of Record, formal reporting, budgeting, manufacturing, supply chain, and an evidence-bounded AI finance copilot.
+
+The roadmap is an **input to architecture decisions**, not a claim that these engines are active. Each financial capability must be separately authorized, finance-owned, effective-dated, tenant-scoped, evidence-backed, independently validated, and tested before activation. The current workspace deliberately keeps valuation, COGS, revenue recognition, capitalization/depreciation, investment calculation, payment execution, tax/payroll determination, filing, external transmission, and accounting-control posting disabled or unimplemented. Indonesian payroll remains draft-only until a qualified Indonesian payroll/tax reviewer gives written, effective-dated approval.
+
+## Using the workspace safely
+
+Open **Workspace guide** in the left navigation for an in-product walkthrough. Start by selecting a venture in the header: that scope determines the records, controls, and authorization visible to you. Use the portfolio and architecture workspaces to understand governance and maturity; use operational modules to create and progress tenant-scoped internal records; use Journal Control to configure/review finance-owned rules, evidence, and simulations; and use Finance Reporting only as an evidence-backed activity view.
+
+The interface marks deliberate boundaries rather than concealing them. A visible control or form does not imply live banking, logistics, invoicing, tax, payroll, valuation, posting, formal statements, or external integrations. Follow the workspace notices, create records only from real authorized operating evidence, and use the audit register to trace changes. The `docs/` directory contains the durable design, research, ADR, and validation records for review in GitHub.
+
 ## Local development and quality gates
 
 Use the project’s managed environment and never store deployment credentials in the repository.
