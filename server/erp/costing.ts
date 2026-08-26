@@ -112,10 +112,14 @@ function allocationLines(input: { targets: Array<{ id: number; quantity: number;
     const measureUnit = input.driver === "weight" ? sourceFacts.weightUnit : input.driver === "volume" ? sourceFacts.volumeUnit : undefined;
     return { target, driverValue: input.driver === "quantity" ? target.quantity : input.driver === "value" ? target.originalValue : input.driver === "weight" || input.driver === "volume" ? measureValue : manualByLayerId.get(target.id) ?? 0, driverUnit: typeof measureUnit === "string" ? measureUnit : null };
   });
+  const measureDriven = input.driver === "weight" || input.driver === "volume";
+  const declaredUnits = Array.from(new Set(raw.map(line => line.driverUnit).filter((unit): unit is string => typeof unit === "string" && unit.length > 0)));
+  if (measureDriven && raw.some(line => line.driverUnit === null)) throw new Error(`Selected ${input.driver} allocation targets must each retain an explicit declared unit.`);
+  if (measureDriven && declaredUnits.length !== 1) throw new Error(`Selected ${input.driver} allocation targets declare incompatible units (${declaredUnits.join(", ")}). Unit conversion is not implemented.`);
   const totalDriver = raw.reduce((sum, line) => sum + line.driverValue, 0); if (!Number.isFinite(totalDriver) || totalDriver <= 0) throw new Error("Selected allocation driver has no positive eligible total.");
   let allocatedCents = 0; const totalCents = Math.round(input.suppliedTotal * 100);
   const lines = raw.map((line, index) => { const final = index === raw.length - 1; const cents = final ? totalCents - allocatedCents : Math.floor(totalCents * line.driverValue / totalDriver); allocatedCents += cents; return { costLayerId: line.target.id, driverValue: line.driverValue, driverUnit: line.driverUnit, allocatedValue: money(cents / 100), allocatedCents: cents, residualApplied: final ? totalCents - (allocatedCents - cents) - cents : 0 }; });
-  return { lines, totalDriver, allocationTotal: money(lines.reduce((sum, line) => sum + line.allocatedValue, 0)), residualTargetLayerId: lines[lines.length - 1]?.costLayerId ?? null };
+  return { lines, driverUnit: measureDriven ? declaredUnits[0] ?? null : null, totalDriver, allocationTotal: money(lines.reduce((sum, line) => sum + line.allocatedValue, 0)), residualTargetLayerId: lines[lines.length - 1]?.costLayerId ?? null };
 }
 
 export async function createLandedCostAllocationEvidence(input: { ventureId: number; costingPolicyRevisionId: number; costingDate: string; landedCostCategory: LandedCostCategory; allocationDriver: AllocationDriver; totalAmount: number; currency: string; targetCostLayerIds: number[]; manualDrivers?: Array<{ costLayerId: number; driverValue: number }>; rationale: string; accountingCalculationEvidenceId?: number; actorUserId: number }) {

@@ -21,7 +21,7 @@ The layer model records receipt, issue, and allocated landed-cost context separa
 
 ## Landed cost and attribution
 
-Allowed landed-charge categories are freight, insurance, customs, duty, handling, and miscellaneous. Allowed allocation drivers are quantity, weight, value, volume, and a finance-approved manual driver. The service must preserve the selected driver values, eligible target set, weight basis, exact rounding, deterministic residual recipient, policy revision, and explanatory narrative. It must refuse empty target sets, negative/zero driver totals, currency mismatch, cross-tenant targets, incomplete source facts, unapproved manual drivers, and any allocation that does not reconcile exactly to the supplied charge amount.
+Allowed landed-charge categories are freight, insurance, customs, duty, handling, and miscellaneous. Allowed allocation drivers are quantity, weight, value, volume, and a finance-approved manual driver. The service must preserve the selected driver values, eligible target set, declared measure unit when used, exact rounding, deterministic residual recipient, policy revision, and explanatory narrative. Weight and volume drivers use only explicitly captured immutable receipt source facts. Every selected target must retain the same declared unit for the selected measure; missing or mixed units refuse and retain refusal evidence. No unit conversion, default, equivalence assumption, or inferred measure is implemented. The service must refuse empty target sets, negative/zero driver totals, currency mismatch, cross-tenant targets, incomplete source facts, incompatible declared measurement units, unapproved manual drivers, and any allocation that does not reconcile exactly to the supplied charge amount.
 
 Cost-center, profit-center, and internal-order attribution are explicit source facts, not inferred accounting dimensions. Their codes are snapshotted on the cost-layer/evidence record and may later be mapped through separately governed finance dimensions. A missing code remains missing; no default is assigned.
 
@@ -33,6 +33,7 @@ Costing calculations produce canonical input/output payloads with SHA-256 hashes
 | --- | --- |
 | Quantity | Layer receipt quantity is positive; consumed quantity never exceeds remaining quantity; remaining equals original plus allocations’ quantity-neutral state minus consumption. |
 | Value | Layer value, allocation total, and consumption value round deterministically to currency precision; allocation outputs sum exactly to the supplied charge. |
+| Measurement | Weight/volume drivers use retained explicit values and declared units only; selected targets retain one identical declared unit, otherwise evidence is refused without conversion or inference. |
 | Policy | Exactly one approved effective policy matches an accounting date; ambiguous/no-match selections refuse. |
 | Tenant/source | Every source movement, master, attribution, policy, and target belongs to one active venture. |
 | Immutability | Completed/refused calculation, layer snapshots, input/output hashes, and predecessor relation are never updated. |
