@@ -4,7 +4,6 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Route, Switch } from "wouter";
 import { lazy, Suspense } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { ThemeProvider } from "./contexts/ThemeContext";
 import { VentureProvider } from "./contexts/VentureContext";
 
 const NotFound = lazy(() => import("@/pages/NotFound"));
@@ -78,11 +77,7 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
-        <TooltipProvider>
+      <TooltipProvider>
           <VentureProvider>
             <EnterpriseShell>
               <Suspense fallback={<div className="rounded-2xl border border-[#dfe3dc] bg-white p-8 text-sm text-[#5f6f65]">Loading the selected operational workspace…</div>}>
@@ -91,8 +86,7 @@ function App() {
             </EnterpriseShell>
             <Toaster richColors position="top-right" />
           </VentureProvider>
-        </TooltipProvider>
-      </ThemeProvider>
+      </TooltipProvider>
     </ErrorBoundary>
   );
 }

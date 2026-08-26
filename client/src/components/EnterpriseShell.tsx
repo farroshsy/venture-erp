@@ -1,9 +1,10 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import { useVenture } from "@/contexts/VentureContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArrowRightLeft, BookOpenCheck, Boxes, BriefcaseBusiness, Calculator, ChevronDown, Factory, FileSearch, GitBranch, Globe2, Grid2X2, KeyRound, Landmark, LayoutDashboard, LogOut, MessageSquareText, Network, PanelLeftClose, PanelLeftOpen, Scale, ScrollText, ShieldCheck, ShoppingCart, Users, Workflow } from "lucide-react";
+import { ArrowRightLeft, BookOpenCheck, Boxes, BriefcaseBusiness, Calculator, ChevronDown, Factory, FileSearch, GitBranch, Globe2, Grid2X2, KeyRound, Landmark, LayoutDashboard, LogOut, MessageSquareText, Moon, Network, PanelLeftClose, PanelLeftOpen, Scale, ScrollText, ShieldCheck, ShoppingCart, Sun, Users, Workflow } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
@@ -38,6 +39,7 @@ const navigation = [
 export function EnterpriseShell({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const { ventures, activeVenture, activeVentureId, setActiveVentureId, isLoading } = useVenture();
+  const { theme, toggleTheme } = useTheme();
   const [location] = useLocation();
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -93,6 +95,7 @@ export function EnterpriseShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-3 lg:hidden"><Landmark className="h-5 w-5 text-[#164e45]" /><span className="text-sm font-extrabold tracking-[0.12em]">VENTURE ERP</span></div>
           <div className="hidden items-center gap-3 lg:flex"><GitBranch className="h-4 w-4 text-[#6c786f]" /><span className="text-xs font-semibold text-[#66726a]">Service-aligned foundation</span></div>
           <div className="flex items-center gap-3">
+            <button onClick={toggleTheme} className="rounded-xl border border-[#d6dbd2] bg-white p-2 text-[#59675e] transition hover:bg-[#f1f5f2]" aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`} title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}>{theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}</button>
             <div className="relative">
               <select aria-label="Active venture" value={activeVentureId ?? ""} disabled={isLoading || ventures.length === 0} onChange={event => setActiveVentureId(Number(event.target.value))} className="appearance-none rounded-xl border border-[#d6dbd2] bg-white py-2 pl-3 pr-9 text-xs font-semibold text-[#293630] outline-none transition focus:border-[#1a6858] focus:ring-2 focus:ring-[#1a6858]/15">
                 {ventures.length === 0 && <option value="">No venture selected</option>}

@@ -159,6 +159,15 @@ input.enterprise-input[type="number"]::-webkit-outer-spin-button {
   --sidebar-ring: oklch(0.64 0.11 164);
 }
 
+.dark .min-h-screen.bg-\[\#f5f6f3\] { background: #182925 !important; color: #e4eee9 !important; }
+.dark header.bg-\[\#f5f6f3\]\/90 { background: rgb(24 41 37 / 92%) !important; border-color: rgb(255 255 255 / 12%) !important; }
+.dark .bg-white { background-color: #223630 !important; }
+.dark .bg-\[\#fbfdfb\], .dark .bg-\[\#f7fbf8\], .dark .bg-\[\#f6f8f5\] { background-color: #263c35 !important; }
+.dark .text-\[\#243b32\], .dark .text-\[\#294337\], .dark .text-\[\#182421\] { color: #e4eee9 !important; }
+.dark .text-\[\#66766d\], .dark .text-\[\#64766c\], .dark .text-\[\#78847c\] { color: #c0d0c8 !important; }
+.dark .border-\[\#dfe3dc\], .dark .border-\[\#e0e9e3\], .dark .border-\[\#d6dbd2\] { border-color: rgb(255 255 255 / 12%) !important; }
+.dark .enterprise-input { background: #1d302a; border-color: rgb(255 255 255 / 16%); color: #e4eee9; }
+
 @layer base {
   * { @apply border-border outline-ring/50; }
   body {
