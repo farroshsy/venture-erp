@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { getDb } = vi.hoisted(() => ({ getDb: vi.fn() }));
 vi.mock("../db", () => ({ getDb }));
 
-import { createOperationalRecord, createPostingRuleRevision } from "./service";
+import { createAccountClassificationRevision, createOperationalRecord, createPostingRuleRevision } from "./service";
 
 function fakeDb(queryResults: unknown[][]) {
   const inserted: unknown[] = [];
@@ -100,5 +100,14 @@ describe("deterministic posting-rule allocation controls", () => {
 
     await expect(createPostingRuleRevision({ ventureId: 21, ruleCode: "VALIDATION-ALLOCATION-GUARD", ruleName: "Validation allocation guard", eventType: "procurement_receipt", effectiveFrom: "2026-08-25", debitAccountMasterId: 10, creditAccountMasterId: 11, debitAllocations: [{ accountMasterId: 11, allocationBasisPoints: 10_000, narrative: "Invalid balancing-account debit" }], changeRationale: "VALIDATION-ONLY allocation guard", createdByUserId: 7 })).rejects.toThrow("must not use the balancing credit account");
     expect(inserted).toEqual([]);
+  });
+});
+
+describe("account-classification revision controls", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("refuses a presentation section and normal balance that conflict with the finance-owned classification family before persistence", async () => {
+    await expect(createAccountClassificationRevision({ ventureId: 21, accountMasterId: 10, classificationFamily: "asset", statementSection: "operating_revenue", normalBalance: "credit", effectiveFrom: "2026-08-26", rationale: "Invalid classification guard", createdByUserId: 7 })).rejects.toThrow("is not valid for asset classification");
+    expect(getDb).not.toHaveBeenCalled();
   });
 });

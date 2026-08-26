@@ -373,6 +373,28 @@ export const erpJournalLines = mysqlTable("erp_journal_lines", {
   index("erp_journal_line_venture_journal_idx").on(table.ventureId, table.journalId),
 ]);
 
+export const erpAccountClassificationRevisions = mysqlTable("erp_account_classification_revisions", {
+  id: int("id").autoincrement().primaryKey(),
+  ventureId: int("ventureId").notNull().references(() => ventures.id),
+  accountMasterId: int("accountMasterId").notNull().references(() => erpMasterRecords.id),
+  revision: int("revision").notNull(),
+  classificationFamily: mysqlEnum("classificationFamily", ["asset", "liability", "equity", "revenue", "expense", "memo"]).notNull(),
+  statementSection: mysqlEnum("statementSection", ["current_assets", "noncurrent_assets", "current_liabilities", "noncurrent_liabilities", "equity", "operating_revenue", "other_income", "operating_expense", "other_expense", "memo"]).notNull(),
+  normalBalance: mysqlEnum("normalBalance", ["debit", "credit"]).notNull(),
+  effectiveFrom: varchar("effectiveFrom", { length: 10 }).notNull(),
+  effectiveTo: varchar("effectiveTo", { length: 10 }),
+  status: mysqlEnum("status", ["draft", "approved", "superseded", "retired"]).default("draft").notNull(),
+  rationale: varchar("rationale", { length: 255 }).notNull(),
+  adrReference: varchar("adrReference", { length: 96 }),
+  createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+  approvedByUserId: int("approvedByUserId").references(() => users.id),
+  approvedAt: timestamp("approvedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("erp_account_class_revision_unique").on(table.ventureId, table.accountMasterId, table.revision),
+  index("erp_account_class_venture_account_status_idx").on(table.ventureId, table.accountMasterId, table.status),
+]);
+
 export const erpAccountingEvents = mysqlTable("erp_accounting_events", {
   id: int("id").autoincrement().primaryKey(),
   ventureId: int("ventureId").notNull().references(() => ventures.id),

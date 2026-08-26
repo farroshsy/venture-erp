@@ -179,6 +179,31 @@ describe("typed-route sales lifecycle with real authorization", () => {
     expect(audits.some(item => item.eventType === "ledger_calculation_evidence.created" && (item.payload as { noJournalCreated?: boolean; noExternalEffect?: boolean }).noJournalCreated === true && (item.payload as { noExternalEffect?: boolean }).noExternalEffect === true)).toBe(true);
   }, 20_000);
 
+  it("attaches an approved effective-dated finance classification to retained immutable evidence without recalculating, rewriting, or posting", async () => {
+    const operator = callerFor(operatorUserId, operatorOpenId); const admin = callerFor(1, "owner");
+    const debitAccount = (await admin.master.list({ ventureId })).find(master => master.domain === "account" && master.code === "VALIDATION-E2E-ACCOUNTING-DEBIT-20260825");
+    const period = (await admin.period.list({ ventureId })).find(candidate => candidate.code === "VALIDATION-E2E-ACCOUNTING-PERIOD-20260825");
+    expect(debitAccount).toBeTruthy(); expect(period).toBeTruthy();
+    await expect(operator.accountClassifications.createRevision({ ventureId, accountMasterId: debitAccount!.id, classificationFamily: "asset", statementSection: "current_assets", normalBalance: "debit", effectiveFrom: "2026-08-01", rationale: "VALIDATION-ONLY operator must not control financial presentation." })).rejects.toThrow();
+    let revision = (await admin.accountClassifications.list({ ventureId })).find(item => item.accountMasterId === debitAccount!.id && item.effectiveFrom === "2026-08-01" && item.classificationFamily === "asset");
+    if (!revision) await admin.accountClassifications.createRevision({ ventureId, accountMasterId: debitAccount!.id, classificationFamily: "asset", statementSection: "current_assets", normalBalance: "debit", effectiveFrom: "2026-08-01", rationale: "VALIDATION-ONLY governed classification coverage for retained evidence." });
+    revision = (await admin.accountClassifications.list({ ventureId })).find(item => item.accountMasterId === debitAccount!.id && item.effectiveFrom === "2026-08-01" && item.classificationFamily === "asset")!;
+    if (revision.status === "draft") await admin.accountClassifications.approveRevision({ ventureId, accountClassificationRevisionId: revision.id });
+    const journalCountBefore = (await admin.journal.list({ ventureId })).length;
+    const eventCountBefore = (await admin.accountingControl.overview({ ventureId })).events.length;
+    const evidenceCountBefore = (await admin.accountingControl.calculationEvidence({ ventureId })).length;
+    const report = await admin.financeReporting.controlledEvidence({ ventureId, accountingPeriodId: period!.id, accountMasterId: debitAccount!.id });
+    expect(report.classificationCoverage).toMatchObject({ approvedRevisionCount: expect.any(Number), classifiedEvidenceLineCount: expect.any(Number), policy: "effective_dated_finance_owned_read_model_only", noHistoricalRewrite: true });
+    expect(report.current.generalLedgerActivity.some(line => line.accountMasterId === debitAccount!.id && line.classificationStatus === "classified" && line.accountClassification?.id === revision!.id && line.accountClassification?.statementSection === "current_assets")).toBe(true);
+    expect(report.formalStatements).toMatchObject({ balanceSheet: "not_available_pending_statement_policy_and_frozen_classification_evidence", incomeStatement: "not_available_pending_statement_policy_and_frozen_classification_evidence" });
+    expect((await admin.journal.list({ ventureId })).length).toBe(journalCountBefore);
+    expect((await admin.accountingControl.overview({ ventureId })).events.length).toBe(eventCountBefore);
+    expect((await admin.accountingControl.calculationEvidence({ ventureId })).length).toBe(evidenceCountBefore);
+    const audits = await admin.audit({ ventureId });
+    expect(audits.some(event => event.eventType === "account_classification_revision.created" && (event.payload as { accountMasterId?: number; noPosting?: boolean; noExternalEffect?: boolean }).accountMasterId === debitAccount!.id && (event.payload as { noPosting?: boolean }).noPosting === true && (event.payload as { noExternalEffect?: boolean }).noExternalEffect === true)).toBe(true);
+    expect(audits.some(event => event.eventType === "account_classification_revision.approved" && (event.payload as { accountMasterId?: number; noBalanceMutation?: boolean }).accountMasterId === debitAccount!.id && (event.payload as { noBalanceMutation?: boolean }).noBalanceMutation === true)).toBe(true);
+  }, 20_000);
+
   it("retains a supplier invoice reference once per active supplier and venture, rejects a duplicate, and records only internal evidence", async () => {
     const operator = callerFor(operatorUserId, operatorOpenId); const admin = callerFor(1, "owner");
     const supplierCode = "VALIDATION-E2E-SUPPLIER-REFERENCE-SUPPLIER-20260825";

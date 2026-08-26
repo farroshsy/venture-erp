@@ -33,6 +33,9 @@ vi.mock("../erp/service", () => ({
   verifyAccountingCalculationEvidenceChain: vi.fn(),
   getControlledFinanceReporting: vi.fn(),
   reviewJournalProposal: vi.fn(),
+  listAccountClassificationRevisions: vi.fn(),
+  createAccountClassificationRevision: vi.fn(),
+  approveAccountClassificationRevision: vi.fn(),
   listFinanceDimensions: vi.fn(),
   createFinanceDimensionDefinition: vi.fn(),
   activateFinanceDimensionDefinition: vi.fn(),
@@ -221,6 +224,18 @@ describe("operational ERP router", () => {
     await expect(caller().financeDimensions.activateValue({ ventureId: 21, financeDimensionValueId: 45 })).resolves.toMatchObject({ status: "active" });
     expect(service.createFinanceDimensionDefinition).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, code: "COST_CENTER", createdByUserId: 7 }));
     expect(service.createFinanceDimensionValue).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, financeDimensionDefinitionId: 44, code: "OPS-001", createdByUserId: 7 }));
+  });
+  it("keeps effective-dated account classifications inside finance authorization and forwards no posting instruction", async () => {
+    vi.mocked(requireVentureRole).mockReset();
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.listAccountClassificationRevisions).mockResolvedValue([{ id: 61, accountMasterId: 10, classificationFamily: "asset", statementSection: "current_assets", normalBalance: "debit", status: "approved" }] as never);
+    vi.mocked(service.createAccountClassificationRevision).mockResolvedValue({ id: 62, revision: 2, status: "draft" } as never);
+    vi.mocked(service.approveAccountClassificationRevision).mockResolvedValue({ id: 62, status: "approved" } as never);
+    await expect(caller().accountClassifications.list({ ventureId: 21 })).resolves.toMatchObject([{ id: 61, accountMasterId: 10, status: "approved" }]);
+    await expect(caller().accountClassifications.createRevision({ ventureId: 21, accountMasterId: 10, classificationFamily: "asset", statementSection: "current_assets", normalBalance: "debit", effectiveFrom: "2026-08-26", rationale: "Classification coverage only" })).resolves.toMatchObject({ id: 62, status: "draft" });
+    await expect(caller().accountClassifications.approveRevision({ ventureId: 21, accountClassificationRevisionId: 62 })).resolves.toMatchObject({ status: "approved" });
+    expect(service.createAccountClassificationRevision).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, accountMasterId: 10, classificationFamily: "asset", statementSection: "current_assets", normalBalance: "debit", createdByUserId: 7 }));
+    expect(service.approveAccountClassificationRevision).toHaveBeenCalledWith({ ventureId: 21, accountClassificationRevisionId: 62, actorUserId: 7 });
   });
   it("allows a finance-authorized actor to request an auditable accounting-period close", async () => {
     vi.mocked(requireVentureRole).mockReset();

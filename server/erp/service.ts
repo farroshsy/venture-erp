@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import {
+  erpAccountClassificationRevisions,
   erpAccountingCalculationEvidence,
   erpAccountingEvents,
   erpAccountingPeriods,
@@ -42,6 +43,23 @@ export type MasterDomain = "customer" | "supplier" | "item" | "employee" | "acco
 export type OperationalDomain = "finance" | "sales" | "procurement" | "inventory" | "people" | "payroll" | "projects" | "assets" | "service" | "crm";
 export type PostingRuleLine = { entrySide: "debit" | "credit"; accountMasterId: number; narrative: string; allocationBasisPoints?: number };
 export type ProcurementReceiptSourceFacts = { internalReceiptReference?: string; warehouseCode?: string; costCenterCode?: string; projectCode?: string; supplierDeliveryReference?: string; evidenceReference?: string };
+export type AccountClassificationFamily = "asset" | "liability" | "equity" | "revenue" | "expense" | "memo";
+export type AccountStatementSection = "current_assets" | "noncurrent_assets" | "current_liabilities" | "noncurrent_liabilities" | "equity" | "operating_revenue" | "other_income" | "operating_expense" | "other_expense" | "memo";
+
+const expectedClassificationPresentation: Record<AccountClassificationFamily, { sections: AccountStatementSection[]; normalBalance?: "debit" | "credit" }> = {
+  asset: { sections: ["current_assets", "noncurrent_assets"], normalBalance: "debit" },
+  liability: { sections: ["current_liabilities", "noncurrent_liabilities"], normalBalance: "credit" },
+  equity: { sections: ["equity"], normalBalance: "credit" },
+  revenue: { sections: ["operating_revenue", "other_income"], normalBalance: "credit" },
+  expense: { sections: ["operating_expense", "other_expense"], normalBalance: "debit" },
+  memo: { sections: ["memo"] },
+};
+
+function validateAccountClassification(input: { classificationFamily: AccountClassificationFamily; statementSection: AccountStatementSection; normalBalance: "debit" | "credit" }) {
+  const expected = expectedClassificationPresentation[input.classificationFamily];
+  if (!expected.sections.includes(input.statementSection)) throw new Error(`Statement section ${input.statementSection} is not valid for ${input.classificationFamily} classification.`);
+  if (expected.normalBalance && expected.normalBalance !== input.normalBalance) throw new Error(`${input.classificationFamily} classifications require a ${expected.normalBalance} normal balance.`);
+}
 
 function normalizeProcurementReceiptSourceFacts(sourceFacts?: ProcurementReceiptSourceFacts) {
   if (!sourceFacts) return undefined;
@@ -497,6 +515,38 @@ export async function postJournal(input: { ventureId: number; journalId: number;
   return { id: journal.id, status: "posted" as const };
 }
 
+export async function createAccountClassificationRevision(input: { ventureId: number; accountMasterId: number; classificationFamily: AccountClassificationFamily; statementSection: AccountStatementSection; normalBalance: "debit" | "credit"; effectiveFrom: string; effectiveTo?: string; rationale: string; adrReference?: string; createdByUserId: number }) {
+  if (!input.rationale.trim()) throw new Error("Account-classification rationale is required.");
+  if (input.effectiveTo && input.effectiveTo < input.effectiveFrom) throw new Error("Account-classification effective end date cannot precede its effective start date.");
+  validateAccountClassification(input);
+  const db = await requireDb();
+  await requireAccountMaster(db, input.ventureId, input.accountMasterId);
+  const existing = await db.select().from(erpAccountClassificationRevisions).where(and(eq(erpAccountClassificationRevisions.ventureId, input.ventureId), eq(erpAccountClassificationRevisions.accountMasterId, input.accountMasterId))).orderBy(desc(erpAccountClassificationRevisions.revision));
+  const revision = (existing[0]?.revision ?? 0) + 1;
+  const result = await db.insert(erpAccountClassificationRevisions).values({ ventureId: input.ventureId, accountMasterId: input.accountMasterId, revision, classificationFamily: input.classificationFamily, statementSection: input.statementSection, normalBalance: input.normalBalance, effectiveFrom: input.effectiveFrom, effectiveTo: input.effectiveTo ?? null, status: "draft", rationale: input.rationale.trim(), adrReference: input.adrReference?.trim() || null, createdByUserId: input.createdByUserId });
+  const id = Number(result[0].insertId);
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: "account_classification_revision.created", actorUserId: input.createdByUserId, payload: { accountClassificationRevisionId: id, accountMasterId: input.accountMasterId, revision, classificationFamily: input.classificationFamily, statementSection: input.statementSection, normalBalance: input.normalBalance, effectiveFrom: input.effectiveFrom, effectiveTo: input.effectiveTo ?? null, noJournalCreated: true, noPosting: true, noBalanceMutation: true, noExternalEffect: true } });
+  return { id, revision, status: "draft" as const };
+}
+
+export async function approveAccountClassificationRevision(input: { ventureId: number; accountClassificationRevisionId: number; actorUserId: number }) {
+  const db = await requireDb();
+  const [revision] = await db.select().from(erpAccountClassificationRevisions).where(and(eq(erpAccountClassificationRevisions.id, input.accountClassificationRevisionId), eq(erpAccountClassificationRevisions.ventureId, input.ventureId))).limit(1);
+  if (!revision) throw new Error("Account-classification revision not found in the active venture.");
+  if (revision.status !== "draft") throw new Error("Only draft account-classification revisions may be approved.");
+  const approved = await db.select().from(erpAccountClassificationRevisions).where(and(eq(erpAccountClassificationRevisions.ventureId, input.ventureId), eq(erpAccountClassificationRevisions.accountMasterId, revision.accountMasterId), eq(erpAccountClassificationRevisions.status, "approved")));
+  const overlaps = approved.some(item => item.effectiveFrom <= (revision.effectiveTo ?? "9999-12-31") && (item.effectiveTo ?? "9999-12-31") >= revision.effectiveFrom);
+  if (overlaps) throw new Error("Approved account-classification revisions for the same account cannot have overlapping effective dates.");
+  await db.update(erpAccountClassificationRevisions).set({ status: "approved", approvedByUserId: input.actorUserId, approvedAt: new Date() }).where(eq(erpAccountClassificationRevisions.id, revision.id));
+  await createAuditEvent({ ventureId: input.ventureId, domain: "finance", eventType: "account_classification_revision.approved", actorUserId: input.actorUserId, payload: { accountClassificationRevisionId: revision.id, accountMasterId: revision.accountMasterId, revision: revision.revision, effectiveFrom: revision.effectiveFrom, effectiveTo: revision.effectiveTo, noJournalCreated: true, noPosting: true, noBalanceMutation: true, noExternalEffect: true } });
+  return { id: revision.id, status: "approved" as const };
+}
+
+export async function listAccountClassificationRevisions(ventureId: number) {
+  const db = await requireDb();
+  return db.select().from(erpAccountClassificationRevisions).where(eq(erpAccountClassificationRevisions.ventureId, ventureId)).orderBy(desc(erpAccountClassificationRevisions.createdAt));
+}
+
 export async function createPostingRuleRevision(input: { ventureId: number; ruleCode: string; ruleName: string; eventType: "procurement_receipt"; effectiveFrom: string; effectiveTo?: string; debitAccountMasterId: number; creditAccountMasterId: number; debitAllocations?: Array<{ accountMasterId: number; allocationBasisPoints: number; narrative: string }>; changeRationale: string; adrReference?: string; createdByUserId: number }) {
   if (!input.ruleCode.trim() || !input.ruleName.trim() || !input.changeRationale.trim()) throw new Error("Posting-rule code, name, and rationale are required.");
   if (input.effectiveTo && input.effectiveTo < input.effectiveFrom) throw new Error("Posting-rule effective end date cannot precede its effective start date.");
@@ -681,18 +731,22 @@ export async function listAccountingCalculationEvidence(ventureId: number) {
 
 export async function getControlledFinanceReporting(input: { ventureId: number; accountingPeriodId?: number; comparisonAccountingPeriodId?: number; accountMasterId?: number }) {
   const db = await requireDb();
-  const [evidenceRecords, events, accountMasters, periods, chain] = await Promise.all([
+  const [evidenceRecords, events, accountMasters, periods, classifications, chain] = await Promise.all([
     db.select().from(erpAccountingCalculationEvidence).where(eq(erpAccountingCalculationEvidence.ventureId, input.ventureId)).orderBy(erpAccountingCalculationEvidence.id),
     db.select().from(erpAccountingEvents).where(eq(erpAccountingEvents.ventureId, input.ventureId)),
     db.select().from(erpMasterRecords).where(and(eq(erpMasterRecords.ventureId, input.ventureId), eq(erpMasterRecords.domain, "account"))),
     db.select().from(erpAccountingPeriods).where(eq(erpAccountingPeriods.ventureId, input.ventureId)),
+    db.select().from(erpAccountClassificationRevisions).where(eq(erpAccountClassificationRevisions.ventureId, input.ventureId)),
     verifyAccountingCalculationEvidenceChain(input.ventureId),
   ]);
   const eventById = new Map(events.map(event => [event.id, event]));
   const accountById = new Map(accountMasters.map(account => [account.id, account]));
   const periodById = new Map(periods.map(period => [period.id, period]));
+  const classificationsByAccountId = new Map<number, typeof classifications>();
+  for (const classification of classifications) classificationsByAccountId.set(classification.accountMasterId, [...(classificationsByAccountId.get(classification.accountMasterId) ?? []), classification]);
   const chainCheckByEvidenceId = new Map(chain.checks.map(check => [check.id, check]));
-  type ReportLine = { evidenceId: number; calculationKey: string; recordHash: string; accountingEventId: number; accountingDate: string; accountingPeriodId: number | null; accountingPeriodCode: string | null; sourceOperationalRecordId: number; postingRuleRevisionId: number | null; accountMasterId: number; accountCode: string; accountName: string; currency: string; entrySide: "debit" | "credit"; amount: number; narrative: string; frozenDimensions: unknown };
+  type ClassificationMatch = { id: number; revision: number; classificationFamily: AccountClassificationFamily; statementSection: AccountStatementSection; normalBalance: "debit" | "credit"; effectiveFrom: string; effectiveTo: string | null };
+  type ReportLine = { evidenceId: number; calculationKey: string; recordHash: string; accountingEventId: number; accountingDate: string; accountingPeriodId: number | null; accountingPeriodCode: string | null; sourceOperationalRecordId: number; postingRuleRevisionId: number | null; accountMasterId: number; accountCode: string; accountName: string; currency: string; entrySide: "debit" | "credit"; amount: number; narrative: string; frozenDimensions: unknown; classificationStatus: "classified" | "unclassified" | "ambiguous"; accountClassification: ClassificationMatch | null };
   const eligibleLines: ReportLine[] = [];
   const excludedEvidence = evidenceRecords.flatMap(record => {
     const event = eventById.get(record.accountingEventId);
@@ -710,7 +764,9 @@ export async function getControlledFinanceReporting(input: { ventureId: number; 
       const accountMasterId = Number(line.accountMasterId); const amount = Number(line.amount); const entrySide = line.entrySide;
       const account = accountById.get(accountMasterId);
       if (!account || !Number.isFinite(amount) || amount < 0 || (entrySide !== "debit" && entrySide !== "credit")) continue;
-      eligibleLines.push({ evidenceId: record.id, calculationKey: record.calculationKey, recordHash: record.recordHash, accountingEventId: event!.id, accountingDate: event!.accountingDate, accountingPeriodId: event!.accountingPeriodId, accountingPeriodCode: event!.accountingPeriodId ? periodById.get(event!.accountingPeriodId)?.code ?? null : null, sourceOperationalRecordId: event!.sourceOperationalRecordId, postingRuleRevisionId: record.postingRuleRevisionId, accountMasterId, accountCode: account.code, accountName: account.name, currency: typeof line.currency === "string" ? line.currency : event!.functionalCurrency, entrySide, amount: normalizeMoney(amount), narrative: typeof line.narrative === "string" ? line.narrative : "Retained immutable calculation line", frozenDimensions: line.frozenDimensions ?? null });
+      const matches = (classificationsByAccountId.get(accountMasterId) ?? []).filter(classification => classification.status === "approved" && classification.effectiveFrom <= event!.accountingDate && (classification.effectiveTo === null || classification.effectiveTo >= event!.accountingDate));
+      const matched = matches.length === 1 ? matches[0] : null;
+      eligibleLines.push({ evidenceId: record.id, calculationKey: record.calculationKey, recordHash: record.recordHash, accountingEventId: event!.id, accountingDate: event!.accountingDate, accountingPeriodId: event!.accountingPeriodId, accountingPeriodCode: event!.accountingPeriodId ? periodById.get(event!.accountingPeriodId)?.code ?? null : null, sourceOperationalRecordId: event!.sourceOperationalRecordId, postingRuleRevisionId: record.postingRuleRevisionId, accountMasterId, accountCode: account.code, accountName: account.name, currency: typeof line.currency === "string" ? line.currency : event!.functionalCurrency, entrySide, amount: normalizeMoney(amount), narrative: typeof line.narrative === "string" ? line.narrative : "Retained immutable calculation line", frozenDimensions: line.frozenDimensions ?? null, classificationStatus: matches.length === 1 ? "classified" : matches.length === 0 ? "unclassified" : "ambiguous", accountClassification: matched ? { id: matched.id, revision: matched.revision, classificationFamily: matched.classificationFamily, statementSection: matched.statementSection, normalBalance: matched.normalBalance, effectiveFrom: matched.effectiveFrom, effectiveTo: matched.effectiveTo } : null });
     }
     return [];
   });
@@ -732,7 +788,8 @@ export async function getControlledFinanceReporting(input: { ventureId: number; 
     current: buildPeriodProjection(input.accountingPeriodId),
     comparison: input.comparisonAccountingPeriodId ? buildPeriodProjection(input.comparisonAccountingPeriodId) : null,
     excludedEvidence,
-    formalStatements: { trialBalance: "evidence_activity_available" as const, generalLedger: "evidence_activity_available" as const, balanceSheet: "not_available_without_governed_account_classification" as const, incomeStatement: "not_available_without_governed_account_classification" as const, cashFlow: "not_available_without_governed_cash_flow_policy" as const, cogsAndMargin: "not_available_without_governed_valuation_policy" as const, profitability: "not_available_without_governed_dimension_and_source_policy" as const, translatedCurrencyPresentation: "not_available_without_retained_translation_evidence" as const },
+    classificationCoverage: { approvedRevisionCount: classifications.filter(classification => classification.status === "approved").length, eligibleEvidenceLineCount: eligibleLines.length, classifiedEvidenceLineCount: eligibleLines.filter(line => line.classificationStatus === "classified").length, unclassifiedEvidenceLineCount: eligibleLines.filter(line => line.classificationStatus === "unclassified").length, ambiguousEvidenceLineCount: eligibleLines.filter(line => line.classificationStatus === "ambiguous").length, policy: "effective_dated_finance_owned_read_model_only" as const, noHistoricalRewrite: true as const },
+    formalStatements: { trialBalance: "evidence_activity_available" as const, generalLedger: "evidence_activity_available" as const, balanceSheet: "not_available_pending_statement_policy_and_frozen_classification_evidence" as const, incomeStatement: "not_available_pending_statement_policy_and_frozen_classification_evidence" as const, cashFlow: "not_available_without_governed_cash_flow_policy" as const, cogsAndMargin: "not_available_without_governed_valuation_policy" as const, profitability: "not_available_without_governed_dimension_and_source_policy" as const, translatedCurrencyPresentation: "not_available_without_retained_translation_evidence" as const },
     boundary: { noJournalCreated: true as const, noAutomaticPosting: true as const, noBalanceMutation: true as const, noTaxCalculation: true as const, noPayrollCalculation: true as const, noPaymentExecution: true as const, noFiling: true as const, noExternalEffect: true as const },
   };
 }
