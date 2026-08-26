@@ -149,3 +149,4 @@
 - [x] Capture attributable sales-fulfillment source facts in retained inventory issue evidence with no revenue recognition, valuation, COGS, posting, or external effect.
 - [x] Design a disabled sales-fulfillment accounting-event seam that retains source-fact/evidence prerequisites and refuses revenue or COGS effects until separately governed.
 - [x] Capture attributable asset-acquisition source facts in the tenant-scoped asset register with no capitalization, depreciation, valuation, posting, or external effect.
+- [x] Design a disabled asset-accounting event seam that retains acquisition source-fact/evidence prerequisites and refuses capitalization, depreciation, or valuation effects until separately governed.
