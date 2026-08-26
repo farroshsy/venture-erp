@@ -9,6 +9,9 @@ import {
   erpBudgetEnvelopes,
   erpBudgetNodes,
   erpCompensationComponents,
+  erpCostingCalculationEvidence,
+  erpCostingPolicyRevisions,
+  erpCostLayers,
   erpCrmOpportunities,
   erpEmployeeProfiles,
   erpExchangeRates,
@@ -872,6 +875,36 @@ export async function listAccountingControl(ventureId: number) {
     db.select().from(erpJournalProposals).where(eq(erpJournalProposals.ventureId, ventureId)).orderBy(desc(erpJournalProposals.updatedAt)),
   ]);
   return { events, rules, proposals };
+}
+
+export type CanonicalFinancialObjectType = "ledger_account" | "accounting_event" | "financial_dimension" | "financial_dimension_value" | "policy_revision" | "cost_layer" | "calculation_evidence";
+
+export async function getCanonicalFinancialObjectProjection(ventureId: number) {
+  const db = await requireDb();
+  const [accounts, events, dimensionDefinitions, dimensionValues, postingRules, costingPolicies, costLayers, accountingEvidence, costingEvidence] = await Promise.all([
+    db.select().from(erpMasterRecords).where(and(eq(erpMasterRecords.ventureId, ventureId), eq(erpMasterRecords.domain, "account"))),
+    db.select().from(erpAccountingEvents).where(eq(erpAccountingEvents.ventureId, ventureId)),
+    db.select().from(erpFinanceDimensionDefinitions).where(eq(erpFinanceDimensionDefinitions.ventureId, ventureId)),
+    db.select().from(erpFinanceDimensionValues).where(eq(erpFinanceDimensionValues.ventureId, ventureId)),
+    db.select().from(erpPostingRuleRevisions).where(eq(erpPostingRuleRevisions.ventureId, ventureId)),
+    db.select().from(erpCostingPolicyRevisions).where(eq(erpCostingPolicyRevisions.ventureId, ventureId)),
+    db.select().from(erpCostLayers).where(eq(erpCostLayers.ventureId, ventureId)),
+    db.select().from(erpAccountingCalculationEvidence).where(eq(erpAccountingCalculationEvidence.ventureId, ventureId)),
+    db.select().from(erpCostingCalculationEvidence).where(eq(erpCostingCalculationEvidence.ventureId, ventureId)),
+  ]);
+  const objects: Array<{ canonicalType: CanonicalFinancialObjectType; canonicalId: string; sourceEntity: string; sourceId: number; label: string; status: string; effectiveAt: string | null; currency: string | null; traceability: Record<string, unknown> }> = [
+    ...accounts.map(account => ({ canonicalType: "ledger_account" as const, canonicalId: `LedgerAccount:${account.id}`, sourceEntity: "erp_master_records", sourceId: account.id, label: `${account.code} · ${account.name}`, status: account.status, effectiveAt: null, currency: null, traceability: { sourceMasterRecordId: account.id, masterDomain: account.domain } })),
+    ...events.map(event => ({ canonicalType: "accounting_event" as const, canonicalId: `AccountingEvent:${event.id}`, sourceEntity: "erp_accounting_events", sourceId: event.id, label: `${event.eventType} · ${event.eventKey}`, status: "immutable", effectiveAt: event.accountingDate, currency: event.functionalCurrency, traceability: { eventKey: event.eventKey, sourceOperationalRecordId: event.sourceOperationalRecordId, sourceInventoryMovementId: event.sourceInventoryMovementId, sourceSnapshot: event.sourceSnapshot, dimensionsSnapshot: event.dimensionsSnapshot, evidenceSnapshot: event.evidenceSnapshot } })),
+    ...dimensionDefinitions.map(definition => ({ canonicalType: "financial_dimension" as const, canonicalId: `FinancialDimension:${definition.id}`, sourceEntity: "erp_finance_dimension_definitions", sourceId: definition.id, label: `${definition.code} · ${definition.name}`, status: definition.status, effectiveAt: null, currency: null, traceability: { requiredForProposal: definition.requiredForProposal, valueCount: dimensionValues.filter(value => value.dimensionDefinitionId === definition.id).length } })),
+    ...dimensionValues.map(value => ({ canonicalType: "financial_dimension_value" as const, canonicalId: `FinancialDimensionValue:${value.id}`, sourceEntity: "erp_finance_dimension_values", sourceId: value.id, label: `${value.code} · ${value.name}`, status: value.status, effectiveAt: null, currency: null, traceability: { dimensionDefinitionId: value.dimensionDefinitionId, attributes: value.attributes } })),
+    ...postingRules.map(policy => ({ canonicalType: "policy_revision" as const, canonicalId: `PostingPolicyRevision:${policy.id}`, sourceEntity: "erp_posting_rule_revisions", sourceId: policy.id, label: `${policy.ruleCode} · r${policy.revision}`, status: policy.status, effectiveAt: policy.effectiveFrom, currency: null, traceability: { policyKind: "posting_rule", eventType: policy.eventType, effectiveTo: policy.effectiveTo, lineConfiguration: policy.lineConfiguration } })),
+    ...costingPolicies.map(policy => ({ canonicalType: "policy_revision" as const, canonicalId: `CostingPolicyRevision:${policy.id}`, sourceEntity: "erp_costing_policy_revisions", sourceId: policy.id, label: `${policy.policyCode} · r${policy.revision}`, status: policy.status, effectiveAt: policy.effectiveFrom, currency: null, traceability: { policyKind: "costing_policy", costDomain: policy.costDomain, valuationMethod: policy.valuationMethod, effectiveTo: policy.effectiveTo, sourceRequirements: policy.sourceRequirements } })),
+    ...costLayers.map(layer => ({ canonicalType: "cost_layer" as const, canonicalId: `CostLayer:${layer.id}`, sourceEntity: "erp_cost_layers", sourceId: layer.id, label: `${layer.layerKey} · item #${layer.itemMasterId}`, status: "immutable", effectiveAt: new Date(layer.createdAt).toISOString(), currency: layer.currency, traceability: { layerType: layer.layerType, sourceInventoryMovementId: layer.sourceInventoryMovementId, costingPolicyRevisionId: layer.costingPolicyRevisionId, sourceHash: layer.sourceHash, quantity: Number(layer.quantity), remainingQuantity: Number(layer.remainingQuantity), originalValue: Number(layer.originalValue), remainingValue: Number(layer.remainingValue), attributionSnapshot: layer.attributionSnapshot } })),
+    ...accountingEvidence.map(record => ({ canonicalType: "calculation_evidence" as const, canonicalId: `AccountingCalculationEvidence:${record.id}`, sourceEntity: "erp_accounting_calculation_evidence", sourceId: record.id, label: record.calculationKey, status: record.status, effectiveAt: new Date(record.calculatedAt).toISOString(), currency: null, traceability: { evidenceKind: "accounting", accountingEventId: record.accountingEventId, postingRuleRevisionId: record.postingRuleRevisionId, inputHash: record.inputHash, outputHash: record.outputHash, previousRecordHash: record.previousRecordHash, recordHash: record.recordHash } })),
+    ...costingEvidence.map(record => ({ canonicalType: "calculation_evidence" as const, canonicalId: `CostingCalculationEvidence:${record.id}`, sourceEntity: "erp_costing_calculation_evidence", sourceId: record.id, label: record.calculationKey, status: record.status, effectiveAt: new Date(record.calculatedAt).toISOString(), currency: null, traceability: { evidenceKind: "costing", calculationType: record.calculationType, costingPolicyRevisionId: record.costingPolicyRevisionId, costLayerId: record.costLayerId, accountingCalculationEvidenceId: record.accountingCalculationEvidenceId, inputHash: record.inputHash, outputHash: record.outputHash, previousRecordHash: record.previousRecordHash, recordHash: record.recordHash } })),
+  ].sort((left, right) => left.canonicalType.localeCompare(right.canonicalType) || left.canonicalId.localeCompare(right.canonicalId));
+  const objectCounts = objects.reduce<Record<CanonicalFinancialObjectType, number>>((counts, object) => ({ ...counts, [object.canonicalType]: counts[object.canonicalType] + 1 }), { ledger_account: 0, accounting_event: 0, financial_dimension: 0, financial_dimension_value: 0, policy_revision: 0, cost_layer: 0, calculation_evidence: 0 });
+  return { model: { name: "Canonical Financial Object Model", version: "0.1-read-projection", posture: "bounded_internal_vocabulary_not_an_external_standard_claim" }, objects, objectCounts, exclusions: ["No canonical Resource, Obligation, Position, Journal Entry, external transaction, tax, payroll, or formal-statement object is projected in this increment.", "The projection reads existing tenant-scoped source evidence and does not create a replacement financial system of record."], boundary: { readOnlyProjection: true as const, noSourceRewrite: true as const, noJournalCreated: true as const, noAutomaticPosting: true as const, noBalanceMutation: true as const, noFinancialStatementMutation: true as const, noTaxCalculation: true as const, noPayrollCalculation: true as const, noPaymentExecution: true as const, noFiling: true as const, noIntegrationTriggered: true as const, noExternalEffect: true as const } };
 }
 
 export async function createFinanceDimensionDefinition(input: { ventureId: number; code: string; name: string; description?: string; requiredForProposal?: boolean; createdByUserId: number }) {

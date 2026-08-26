@@ -168,3 +168,4 @@
 - [x] Build contextual in-application utilization guidance that explains role-appropriate navigation, evidence, automation posture, and safe next actions without implying unavailable financial or regulatory capabilities.
 - [x] Modernize the Journal Control experience with guided evidence-first workflow framing and deterministic, human-gated automation assistance that cannot create/post journals or cause any financial or external effect.
 - [x] Strengthen the Costing Engine’s read-only inventory valuation review with explicit selected-layer rationale, unit-cost derivation, remaining-balance explanation, deterministic rounding/invariant evidence, and refusal of unsupported governed inputs without inventory or financial effects.
+- [x] Introduce a bounded, tenant-scoped read-only Canonical Financial Object Model projection over existing finance and Costing Engine evidence, with source traceability, no source rewrites, and no financial or external effects.
