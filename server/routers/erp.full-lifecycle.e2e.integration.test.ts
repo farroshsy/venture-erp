@@ -182,20 +182,27 @@ describe("typed-route sales lifecycle with real authorization", () => {
   it("attaches an approved effective-dated finance classification to retained immutable evidence without recalculating, rewriting, or posting", async () => {
     const operator = callerFor(operatorUserId, operatorOpenId); const admin = callerFor(1, "owner");
     const debitAccount = (await admin.master.list({ ventureId })).find(master => master.domain === "account" && master.code === "VALIDATION-E2E-ACCOUNTING-DEBIT-20260825");
+    const creditAccount = (await admin.master.list({ ventureId })).find(master => master.domain === "account" && master.code === "VALIDATION-E2E-ACCOUNTING-CREDIT-20260825");
     const period = (await admin.period.list({ ventureId })).find(candidate => candidate.code === "VALIDATION-E2E-ACCOUNTING-PERIOD-20260825");
-    expect(debitAccount).toBeTruthy(); expect(period).toBeTruthy();
+    expect(debitAccount).toBeTruthy(); expect(creditAccount).toBeTruthy(); expect(period).toBeTruthy();
     await expect(operator.accountClassifications.createRevision({ ventureId, accountMasterId: debitAccount!.id, classificationFamily: "asset", statementSection: "current_assets", normalBalance: "debit", effectiveFrom: "2026-08-01", rationale: "VALIDATION-ONLY operator must not control financial presentation." })).rejects.toThrow();
     let revision = (await admin.accountClassifications.list({ ventureId })).find(item => item.accountMasterId === debitAccount!.id && item.effectiveFrom === "2026-08-01" && item.classificationFamily === "asset");
     if (!revision) await admin.accountClassifications.createRevision({ ventureId, accountMasterId: debitAccount!.id, classificationFamily: "asset", statementSection: "current_assets", normalBalance: "debit", effectiveFrom: "2026-08-01", rationale: "VALIDATION-ONLY governed classification coverage for retained evidence." });
     revision = (await admin.accountClassifications.list({ ventureId })).find(item => item.accountMasterId === debitAccount!.id && item.effectiveFrom === "2026-08-01" && item.classificationFamily === "asset")!;
     if (revision.status === "draft") await admin.accountClassifications.approveRevision({ ventureId, accountClassificationRevisionId: revision.id });
+    let creditRevision = (await admin.accountClassifications.list({ ventureId })).find(item => item.accountMasterId === creditAccount!.id && item.effectiveFrom === "2026-08-01" && item.classificationFamily === "liability");
+    if (!creditRevision) await admin.accountClassifications.createRevision({ ventureId, accountMasterId: creditAccount!.id, classificationFamily: "liability", statementSection: "current_liabilities", normalBalance: "credit", effectiveFrom: "2026-08-01", rationale: "VALIDATION-ONLY governed classification coverage for retained receipt-clearing evidence." });
+    creditRevision = (await admin.accountClassifications.list({ ventureId })).find(item => item.accountMasterId === creditAccount!.id && item.effectiveFrom === "2026-08-01" && item.classificationFamily === "liability")!;
+    if (creditRevision.status === "draft") await admin.accountClassifications.approveRevision({ ventureId, accountClassificationRevisionId: creditRevision.id });
     const journalCountBefore = (await admin.journal.list({ ventureId })).length;
     const eventCountBefore = (await admin.accountingControl.overview({ ventureId })).events.length;
     const evidenceCountBefore = (await admin.accountingControl.calculationEvidence({ ventureId })).length;
     const report = await admin.financeReporting.controlledEvidence({ ventureId, accountingPeriodId: period!.id, accountMasterId: debitAccount!.id });
     expect(report.classificationCoverage).toMatchObject({ approvedRevisionCount: expect.any(Number), classifiedEvidenceLineCount: expect.any(Number), policy: "effective_dated_finance_owned_read_model_only", noHistoricalRewrite: true });
     expect(report.current.generalLedgerActivity.some(line => line.accountMasterId === debitAccount!.id && line.classificationStatus === "classified" && line.accountClassification?.id === revision!.id && line.accountClassification?.statementSection === "current_assets")).toBe(true);
+    expect(report.current.generalLedgerActivity.every(line => line.accountMasterId === debitAccount!.id)).toBe(true);
     expect(report.formalStatements).toMatchObject({ balanceSheet: "not_available_pending_statement_policy_and_frozen_classification_evidence", incomeStatement: "not_available_pending_statement_policy_and_frozen_classification_evidence" });
+    expect(report.formalStatementReadiness.find(item => item.statement === "balance_sheet")).toMatchObject({ available: false, gates: expect.arrayContaining([expect.objectContaining({ key: "immutable_evidence_integrity", status: "ready", derivedOnly: true }), expect.objectContaining({ key: "effective_dated_classification_coverage", status: "ready", derivedOnly: true }), expect.objectContaining({ key: "opening_balance_policy", status: "blocked", derivedOnly: false }), expect.objectContaining({ key: "statement_projection_evidence", status: "blocked", derivedOnly: false })]) });
     expect((await admin.journal.list({ ventureId })).length).toBe(journalCountBefore);
     expect((await admin.accountingControl.overview({ ventureId })).events.length).toBe(eventCountBefore);
     expect((await admin.accountingControl.calculationEvidence({ ventureId })).length).toBe(evidenceCountBefore);
