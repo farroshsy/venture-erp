@@ -45,6 +45,8 @@ Finance-authorized users may request read-only valuation previews and validation
 
 Formal COGS, gross profit, inventory valuation, margin, and financial-statement presentation remain unavailable. Future activation requires finance policy, canonical measurement/FX/standard-cost/lot evidence, statement policy, independent review, provenance, correction/reprocessing, reconciliation, and separately authorized accounting integration.
 
+The future correction and reprocessing control seam is documented separately in [`DISABLED-COSTING-CORRECTION-REPROCESSING-DESIGN.md`](./DISABLED-COSTING-CORRECTION-REPROCESSING-DESIGN.md). It is documentation only: no correction or reprocessing command, persistence, migration, route, UI control, layer change, valuation output, COGS result, posting, or financial effect is implemented.
+
 ## Explicit exclusions
 
 This design does not implement manufacturing BOM/routing/WIP/variance; project or service costing; asset capitalization/depreciation; investment calculation/valuation; revenue recognition; COGS; tax/payroll; payment; bank/custody/logistics integration; posting; GL mutation; statutory or financial-statement reporting. Each needs a separate bounded design and activation decision.

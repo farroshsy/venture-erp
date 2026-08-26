@@ -163,3 +163,4 @@
 - [x] Expose optional tenant-scoped immutable accounting-calculation-evidence linkage for Costing Engine valuation previews and landed-cost allocations, with traceability only and no financial side effect.
 - [x] Capture explicitly supplied receipt weight and volume with declared units, propagate them into immutable Costing Engine layers, and support deterministic weight/volume allocation evidence with no inferred or financial side effect.
 - [x] Refuse weight- or volume-driven landed-cost allocations when selected immutable receipt layers declare incompatible units, without conversion, inference, or financial side effect.
+- [x] Design a documentation-only, fail-closed Costing Engine correction and reprocessing seam that preserves immutable evidence and refuses operational or financial effects.
