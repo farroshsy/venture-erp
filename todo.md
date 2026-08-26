@@ -159,3 +159,4 @@
 - [x] Add read-only valuation previews, validation reports, and immutable calculation-evidence chain linkage without valuation posting or financial-statement mutation.
 - [x] Expose governed Costing Engine policy, evidence, and preview controls with finance RBAC, responsive review, documentation, and full validation.
 - [x] Extend governed Costing Engine receipt-layer evidence with explicitly supplied cost-center, profit-center, and internal-order attribution, deterministic allocation traceability, and no inferred or financial side effect.
+- [x] Expose finance-controlled multi-target Costing Engine landed-cost allocation with retained quantity/value/manual drivers, residual explainability, immutable evidence, and no financial side effect.
