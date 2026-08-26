@@ -164,3 +164,6 @@
 - [x] Capture explicitly supplied receipt weight and volume with declared units, propagate them into immutable Costing Engine layers, and support deterministic weight/volume allocation evidence with no inferred or financial side effect.
 - [x] Refuse weight- or volume-driven landed-cost allocations when selected immutable receipt layers declare incompatible units, without conversion, inference, or financial side effect.
 - [x] Design a documentation-only, fail-closed Costing Engine correction and reprocessing seam that preserves immutable evidence and refuses operational or financial effects.
+- [x] Research advanced evidence-first ERP and finance-control practices, then assess the supplied read-only valuation-engine and canonical-financial-object-model proposal against the current architecture and boundaries.
+- [x] Build contextual in-application utilization guidance that explains role-appropriate navigation, evidence, automation posture, and safe next actions without implying unavailable financial or regulatory capabilities.
+- [x] Modernize the Journal Control experience with guided evidence-first workflow framing and deterministic, human-gated automation assistance that cannot create/post journals or cause any financial or external effect.
