@@ -663,6 +663,64 @@ export async function listAccountingCalculationEvidence(ventureId: number) {
   return db.select().from(erpAccountingCalculationEvidence).where(eq(erpAccountingCalculationEvidence.ventureId, ventureId)).orderBy(desc(erpAccountingCalculationEvidence.id));
 }
 
+export async function getControlledFinanceReporting(input: { ventureId: number; accountingPeriodId?: number; comparisonAccountingPeriodId?: number; accountMasterId?: number }) {
+  const db = await requireDb();
+  const [evidenceRecords, events, accountMasters, periods, chain] = await Promise.all([
+    db.select().from(erpAccountingCalculationEvidence).where(eq(erpAccountingCalculationEvidence.ventureId, input.ventureId)).orderBy(erpAccountingCalculationEvidence.id),
+    db.select().from(erpAccountingEvents).where(eq(erpAccountingEvents.ventureId, input.ventureId)),
+    db.select().from(erpMasterRecords).where(and(eq(erpMasterRecords.ventureId, input.ventureId), eq(erpMasterRecords.domain, "account"))),
+    db.select().from(erpAccountingPeriods).where(eq(erpAccountingPeriods.ventureId, input.ventureId)),
+    verifyAccountingCalculationEvidenceChain(input.ventureId),
+  ]);
+  const eventById = new Map(events.map(event => [event.id, event]));
+  const accountById = new Map(accountMasters.map(account => [account.id, account]));
+  const periodById = new Map(periods.map(period => [period.id, period]));
+  const chainCheckByEvidenceId = new Map(chain.checks.map(check => [check.id, check]));
+  type ReportLine = { evidenceId: number; calculationKey: string; recordHash: string; accountingEventId: number; accountingDate: string; accountingPeriodId: number | null; accountingPeriodCode: string | null; sourceOperationalRecordId: number; postingRuleRevisionId: number | null; accountMasterId: number; accountCode: string; accountName: string; currency: string; entrySide: "debit" | "credit"; amount: number; narrative: string; frozenDimensions: unknown };
+  const eligibleLines: ReportLine[] = [];
+  const excludedEvidence = evidenceRecords.flatMap(record => {
+    const event = eventById.get(record.accountingEventId);
+    const check = chainCheckByEvidenceId.get(record.id);
+    const invariant = record.invariantSnapshot as Record<string, unknown>;
+    const reasons = [
+      ...(record.status !== "completed" ? ["evidence_not_completed"] : []),
+      ...(!check?.valid ? ["evidence_chain_or_hash_invalid"] : []),
+      ...(invariant.debitEqualsCredit !== true || invariant.debitAllocationTotals10k !== true || invariant.creditAllocationTotals10k !== true || invariant.allocatedDebitCentsEqualsSource !== true || invariant.deterministicResidualExplained !== true ? ["independent_invariant_invalid"] : []),
+      ...(!event ? ["source_event_missing"] : []),
+    ];
+    if (reasons.length) return [{ evidenceId: record.id, calculationKey: record.calculationKey, reasons }];
+    const snapshot = record.calculationSnapshot as { lines?: Array<Record<string, unknown>> };
+    for (const line of snapshot.lines ?? []) {
+      const accountMasterId = Number(line.accountMasterId); const amount = Number(line.amount); const entrySide = line.entrySide;
+      const account = accountById.get(accountMasterId);
+      if (!account || !Number.isFinite(amount) || amount < 0 || (entrySide !== "debit" && entrySide !== "credit")) continue;
+      eligibleLines.push({ evidenceId: record.id, calculationKey: record.calculationKey, recordHash: record.recordHash, accountingEventId: event!.id, accountingDate: event!.accountingDate, accountingPeriodId: event!.accountingPeriodId, accountingPeriodCode: event!.accountingPeriodId ? periodById.get(event!.accountingPeriodId)?.code ?? null : null, sourceOperationalRecordId: event!.sourceOperationalRecordId, postingRuleRevisionId: record.postingRuleRevisionId, accountMasterId, accountCode: account.code, accountName: account.name, currency: typeof line.currency === "string" ? line.currency : event!.functionalCurrency, entrySide, amount: normalizeMoney(amount), narrative: typeof line.narrative === "string" ? line.narrative : "Retained immutable calculation line", frozenDimensions: line.frozenDimensions ?? null });
+    }
+    return [];
+  });
+  const buildPeriodProjection = (accountingPeriodId?: number) => {
+    const lines = eligibleLines.filter(line => (accountingPeriodId === undefined || line.accountingPeriodId === accountingPeriodId) && (input.accountMasterId === undefined || line.accountMasterId === input.accountMasterId));
+    const buckets = new Map<string, { accountMasterId: number; accountCode: string; accountName: string; currency: string; debit: number; credit: number; netDebit: number; lineCount: number; evidenceIds: number[] }>();
+    for (const line of lines) {
+      const key = `${line.accountMasterId}:${line.currency}`; const bucket = buckets.get(key) ?? { accountMasterId: line.accountMasterId, accountCode: line.accountCode, accountName: line.accountName, currency: line.currency, debit: 0, credit: 0, netDebit: 0, lineCount: 0, evidenceIds: [] };
+      if (line.entrySide === "debit") bucket.debit = normalizeMoney(bucket.debit + line.amount); else bucket.credit = normalizeMoney(bucket.credit + line.amount);
+      bucket.netDebit = Math.round((bucket.debit - bucket.credit) * 100) / 100; bucket.lineCount += 1; if (!bucket.evidenceIds.includes(line.evidenceId)) bucket.evidenceIds.push(line.evidenceId); buckets.set(key, bucket);
+    }
+    return { accountingPeriodId: accountingPeriodId ?? null, accountingPeriodCode: accountingPeriodId ? periodById.get(accountingPeriodId)?.code ?? null : null, trialBalanceActivity: Array.from(buckets.values()).sort((a, b) => a.accountCode.localeCompare(b.accountCode) || a.currency.localeCompare(b.currency)), generalLedgerActivity: lines.sort((a, b) => a.accountingDate.localeCompare(b.accountingDate) || a.evidenceId - b.evidenceId) };
+  };
+  return {
+    ventureId: input.ventureId,
+    source: "immutable_calculation_evidence" as const,
+    reportMode: "evidence_activity_not_posted_gl" as const,
+    chainVerification: { valid: chain.valid, recordCount: chain.recordCount },
+    current: buildPeriodProjection(input.accountingPeriodId),
+    comparison: input.comparisonAccountingPeriodId ? buildPeriodProjection(input.comparisonAccountingPeriodId) : null,
+    excludedEvidence,
+    formalStatements: { trialBalance: "evidence_activity_available" as const, generalLedger: "evidence_activity_available" as const, balanceSheet: "not_available_without_governed_account_classification" as const, incomeStatement: "not_available_without_governed_account_classification" as const, cashFlow: "not_available_without_governed_cash_flow_policy" as const, cogsAndMargin: "not_available_without_governed_valuation_policy" as const, profitability: "not_available_without_governed_dimension_and_source_policy" as const, translatedCurrencyPresentation: "not_available_without_retained_translation_evidence" as const },
+    boundary: { noJournalCreated: true as const, noAutomaticPosting: true as const, noBalanceMutation: true as const, noTaxCalculation: true as const, noPayrollCalculation: true as const, noPaymentExecution: true as const, noFiling: true as const, noExternalEffect: true as const },
+  };
+}
+
 export async function verifyAccountingCalculationEvidenceChain(ventureId: number) {
   const db = await requireDb();
   const records = await db.select().from(erpAccountingCalculationEvidence).where(eq(erpAccountingCalculationEvidence.ventureId, ventureId)).orderBy(erpAccountingCalculationEvidence.id);

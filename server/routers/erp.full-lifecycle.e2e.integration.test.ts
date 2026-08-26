@@ -159,6 +159,7 @@ describe("typed-route sales lifecycle with real authorization", () => {
     const refusedCalculationEvidence = await admin.accountingControl.createCalculationEvidence({ ventureId, accountingEventId: event.id, postingRuleRevisionId: rule.id + 99_999, rationale: "VALIDATION-E2E refused calculation evidence for an unavailable rule; no journal creation or posting." });
     const retainedEvidence = await admin.accountingControl.calculationEvidence({ ventureId });
     const chainVerification = await admin.accountingControl.verifyCalculationEvidenceChain({ ventureId });
+    const controlledReport = await admin.financeReporting.controlledEvidence({ ventureId, accountingPeriodId: period.id });
     expect(calculationEvidence).toMatchObject({ status: "completed" });
     expect(refusedCalculationEvidence).toMatchObject({ status: "refused" });
     expect(retainedEvidence.some(item => item.accountingEventId === event.id && item.recordHash.length === 64 && item.inputHash.length === 64 && item.outputHash.length === 64)).toBe(true);
@@ -167,6 +168,10 @@ describe("typed-route sales lifecycle with real authorization", () => {
     expect(alteredExpectedInputHash).not.toBe(refusedRecord.inputHash);
     expect(chainVerification).toMatchObject({ valid: true, noJournalCreated: true, noAutomaticPosting: true, noExternalEffect: true });
     expect(chainVerification.checks.some(check => check.independentInvariantValid && check.inputHashValid && check.outputHashValid && check.recordHashValid)).toBe(true);
+    expect(controlledReport).toMatchObject({ source: "immutable_calculation_evidence", reportMode: "evidence_activity_not_posted_gl", chainVerification: { valid: true }, boundary: { noJournalCreated: true, noAutomaticPosting: true, noBalanceMutation: true, noExternalEffect: true } });
+    expect(controlledReport.current.trialBalanceActivity.some(item => item.accountMasterId === debitAccount.id && item.currency === "USD" && item.debit >= 125 && item.evidenceIds.includes(calculationEvidence.id))).toBe(true);
+    expect(controlledReport.current.generalLedgerActivity.some(item => item.evidenceId === calculationEvidence.id && item.accountingEventId === event.id && item.sourceOperationalRecordId === purchaseOrder!.id && item.postingRuleRevisionId === rule!.id)).toBe(true);
+    expect(controlledReport.excludedEvidence.some(item => item.evidenceId === refusedCalculationEvidence.id && item.reasons.includes("evidence_not_completed"))).toBe(true);
     expect((await admin.journal.list({ ventureId })).length).toBe(journalCountBefore);
     const audits = await admin.audit({ ventureId });
     expect(audits.some(item => item.eventType === "accounting_event.procurement_receipt_emitted" && item.operationalRecordId === purchaseOrder!.id)).toBe(true);

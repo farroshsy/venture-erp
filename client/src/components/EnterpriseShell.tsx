@@ -3,7 +3,7 @@ import { startLogin } from "@/const";
 import { useVenture } from "@/contexts/VentureContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArrowRightLeft, Boxes, BriefcaseBusiness, ChevronDown, Factory, GitBranch, Globe2, Grid2X2, KeyRound, Landmark, LayoutDashboard, LogOut, MessageSquareText, Network, PanelLeftClose, PanelLeftOpen, Scale, ScrollText, ShieldCheck, ShoppingCart, Users, Workflow } from "lucide-react";
+import { ArrowRightLeft, Boxes, BriefcaseBusiness, ChevronDown, Factory, FileSearch, GitBranch, Globe2, Grid2X2, KeyRound, Landmark, LayoutDashboard, LogOut, MessageSquareText, Network, PanelLeftClose, PanelLeftOpen, Scale, ScrollText, ShieldCheck, ShoppingCart, Users, Workflow } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
@@ -16,6 +16,7 @@ const navigation = [
   { path: "/modules", label: "Module catalog", icon: Boxes },
   { path: "/operations", label: "Operations", icon: Workflow },
   { path: "/journals", label: "Journal control", icon: Landmark },
+  { path: "/finance-reporting", label: "Finance reporting", icon: FileSearch },
   { path: "/inventory", label: "Inventory control", icon: Boxes },
   { path: "/procurement", label: "Procurement control", icon: Workflow },
   { path: "/sales", label: "Sales control", icon: ShoppingCart },

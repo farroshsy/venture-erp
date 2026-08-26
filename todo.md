@@ -139,3 +139,7 @@
 - [x] Expose finance-owned deterministic multi-line debit percentage allocations in the Journal Control rule editor, with exact 10,000-basis-point validation and no conversion or posting path.
 - [x] Expose the finance-owned dimension-definition and dimension-value catalog in Journal Control, with draft/active lifecycle controls and no inferred source values or posting path.
 - [x] Show immutable posting-rule allocation and required-dimension configuration in the Journal Control rule register, with no edit, conversion, or posting path.
+- [x] Define controlled finance-reporting truth, traceability, inclusion/exclusion, and multi-currency boundaries using only immutable accounting calculation/evidence records.
+- [x] Implement read-only, tenant-scoped evidence-backed reporting for available Trial Balance, general-ledger activity, period comparison, account/dimension drill-through, and calculation/source evidence traceability without competing accounting calculations.
+- [x] Design the disabled journal lifecycle with maker/checker separation, approval/refusal evidence, prerequisite validation, amendment/reprocessing, and reversal controls while keeping posting disabled.
+- [x] Record an Investment Book of Record architecture seam that reconciles future position and performance evidence into the canonical financial evidence chain without implementing a separate accounting universe.

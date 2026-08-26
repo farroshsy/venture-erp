@@ -31,6 +31,7 @@ vi.mock("../erp/service", () => ({
   createAccountingCalculationEvidence: vi.fn(),
   listAccountingCalculationEvidence: vi.fn(),
   verifyAccountingCalculationEvidenceChain: vi.fn(),
+  getControlledFinanceReporting: vi.fn(),
   reviewJournalProposal: vi.fn(),
   listFinanceDimensions: vi.fn(),
   createFinanceDimensionDefinition: vi.fn(),
@@ -184,6 +185,7 @@ describe("operational ERP router", () => {
     vi.mocked(service.createAccountingCalculationEvidence).mockResolvedValue({ id: 93, calculationKey: "CALC-SIM-1", recordHash: "a".repeat(64), status: "completed", simulation: {} } as never);
     vi.mocked(service.listAccountingCalculationEvidence).mockResolvedValue([{ id: 93, calculationKey: "CALC-SIM-1", status: "completed" }] as never);
     vi.mocked(service.verifyAccountingCalculationEvidenceChain).mockResolvedValue({ ventureId: 21, recordCount: 1, valid: true, checks: [], noJournalCreated: true, noAutomaticPosting: true, noExternalEffect: true } as never);
+    vi.mocked(service.getControlledFinanceReporting).mockResolvedValue({ ventureId: 21, source: "immutable_calculation_evidence", reportMode: "evidence_activity_not_posted_gl", chainVerification: { valid: true, recordCount: 1 }, current: { trialBalanceActivity: [], generalLedgerActivity: [] }, comparison: null, excludedEvidence: [], formalStatements: { balanceSheet: "not_available_without_governed_account_classification" }, boundary: { noJournalCreated: true, noAutomaticPosting: true, noBalanceMutation: true, noExternalEffect: true } } as never);
     vi.mocked(service.reviewJournalProposal).mockResolvedValue({ id: 92, status: "approved", noJournalCreated: true } as never);
     const overview = await caller().accountingControl.overview({ ventureId: 21 });
     expect(overview.events).toEqual([]);
@@ -195,11 +197,13 @@ describe("operational ERP router", () => {
     await expect(caller().accountingControl.createCalculationEvidence({ ventureId: 21, accountingEventId: 90, rationale: "Immutable validation evidence only." })).resolves.toMatchObject({ calculationKey: "CALC-SIM-1", status: "completed" });
     await expect(caller().accountingControl.calculationEvidence({ ventureId: 21 })).resolves.toMatchObject([{ calculationKey: "CALC-SIM-1" }]);
     await expect(caller().accountingControl.verifyCalculationEvidenceChain({ ventureId: 21 })).resolves.toMatchObject({ valid: true, noJournalCreated: true, noExternalEffect: true });
+    await expect(caller().financeReporting.controlledEvidence({ ventureId: 21, accountingPeriodId: 7, comparisonAccountingPeriodId: 6, accountMasterId: 10 })).resolves.toMatchObject({ source: "immutable_calculation_evidence", reportMode: "evidence_activity_not_posted_gl", boundary: { noJournalCreated: true, noExternalEffect: true } });
     await expect(caller().accountingControl.reviewProposal({ ventureId: 21, journalProposalId: 92, decision: "approved", note: "Internal review only; no journal posting." })).resolves.toMatchObject({ noJournalCreated: true });
     expect(service.createPostingRuleRevision).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, eventType: "procurement_receipt", debitAllocations: [{ accountMasterId: 10, allocationBasisPoints: 6_000, narrative: "Inventory allocation" }, { accountMasterId: 12, allocationBasisPoints: 4_000, narrative: "Receiving allocation" }], createdByUserId: 7 }));
     expect(service.createAccountingCalculationEvidence).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, accountingEventId: 90, actorUserId: 7 }));
     expect(service.listAccountingCalculationEvidence).toHaveBeenCalledWith(21);
     expect(service.verifyAccountingCalculationEvidenceChain).toHaveBeenCalledWith(21);
+    expect(service.getControlledFinanceReporting).toHaveBeenCalledWith({ ventureId: 21, accountingPeriodId: 7, comparisonAccountingPeriodId: 6, accountMasterId: 10 });
     expect(service.reviewJournalProposal).toHaveBeenCalledWith(expect.objectContaining({ ventureId: 21, journalProposalId: 92, decision: "approved", actorUserId: 7 }));
   });
   it("keeps configurable finance dimensions within the active venture and finance authorization", async () => {

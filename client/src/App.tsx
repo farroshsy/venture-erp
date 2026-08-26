@@ -17,6 +17,7 @@ const AccessAdministration = lazy(() => import("./pages/AccessAdministration"));
 const DecisionGovernance = lazy(() => import("./pages/DecisionGovernance"));
 const ExecutiveArchitecture = lazy(() => import("./pages/ExecutiveArchitecture"));
 const JournalControl = lazy(() => import("./pages/JournalControl"));
+const ControlledFinanceReporting = lazy(() => import("./pages/ControlledFinanceReporting"));
 const InventoryControl = lazy(() => import("./pages/InventoryControl"));
 const ProcurementControl = lazy(() => import("./pages/ProcurementControl"));
 const SalesControl = lazy(() => import("./pages/SalesControl"));
@@ -43,6 +44,7 @@ function Router() {
       <Route path={"/modules"} component={ModuleCatalog} />
       <Route path={"/operations"} component={OperationsWorkspace} />
       <Route path={"/journals"} component={JournalControl} />
+      <Route path={"/finance-reporting"} component={ControlledFinanceReporting} />
       <Route path={"/inventory"} component={InventoryControl} />
       <Route path={"/procurement"} component={ProcurementControl} />
       <Route path={"/sales"} component={SalesControl} />
