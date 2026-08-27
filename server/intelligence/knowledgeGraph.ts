@@ -1,9 +1,9 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { eosDecisionMemories, eosEvidenceLinks, eosExternalSourceContracts, eosKeyResults, eosScenarioPreparations, eosStrategicObjectives, governanceCases, erpAuditEvents, erpInventoryMovements, erpItemMasterProfiles, erpOperationalRecords, erpSupplierMasterProfiles, erpWorkflowDefinitions, erpWorkflowInstances, erpWorkflowTasks } from "../../drizzle/schema";
+import { eosDecisionMemories, eosEvidenceLinks, eosExternalAcquisitionRuns, eosExternalEvidenceRecords, eosExternalEvidenceReviews, eosExternalSourceConnections, eosExternalSourceContracts, eosKeyResults, eosScenarioPreparations, eosStrategicObjectives, governanceCases, erpAuditEvents, erpInventoryMovements, erpItemMasterProfiles, erpOperationalRecords, erpSupplierMasterProfiles, erpWorkflowDefinitions, erpWorkflowInstances, erpWorkflowTasks } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { getDecisionIntelligenceOverview } from "./service";
 
-export type KnowledgeGraphNodeKind = "metric" | "evidence_source" | "operational_record" | "inventory_movement" | "canonical_resource" | "canonical_supplier" | "workflow_definition" | "workflow_instance" | "workflow_task" | "audit_event" | "governance_decision" | "strategic_objective" | "key_result" | "decision_memory" | "scenario_preparation" | "external_source_contract" | "evidence_link";
+export type KnowledgeGraphNodeKind = "metric" | "evidence_source" | "operational_record" | "inventory_movement" | "canonical_resource" | "canonical_supplier" | "workflow_definition" | "workflow_instance" | "workflow_task" | "audit_event" | "governance_decision" | "strategic_objective" | "key_result" | "decision_memory" | "scenario_preparation" | "external_source_contract" | "external_source_connection" | "external_acquisition_run" | "external_evidence_record" | "external_evidence_review" | "evidence_link";
 export type KnowledgeGraphEdgeType = "depends_on" | "derived_from" | "references" | "evidenced_by" | "governed_by" | "executed_in";
 
 const sourceNodeId = (source: string) => `EvidenceSource:${source.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "")}`;
@@ -11,7 +11,7 @@ const sourceNodeId = (source: string) => `EvidenceSource:${source.replace(/[^A-Z
 export async function getEnterpriseKnowledgeGraph(ventureId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available.");
-  const [intelligence, records, movements, itemProfiles, supplierProfiles, workflowDefinitions, workflowInstances, workflowTasks, auditEvents, decisions, objectives, keyResults, decisionMemories, scenarios, sourceContracts, evidenceLinks] = await Promise.all([
+  const [intelligence, records, movements, itemProfiles, supplierProfiles, workflowDefinitions, workflowInstances, workflowTasks, auditEvents, decisions, objectives, keyResults, decisionMemories, scenarios, sourceContracts, sourceConnections, acquisitionRuns, externalEvidence, externalReviews, evidenceLinks] = await Promise.all([
     getDecisionIntelligenceOverview(ventureId),
     db.select().from(erpOperationalRecords).where(eq(erpOperationalRecords.ventureId, ventureId)),
     db.select().from(erpInventoryMovements).where(eq(erpInventoryMovements.ventureId, ventureId)),
@@ -27,6 +27,10 @@ export async function getEnterpriseKnowledgeGraph(ventureId: number) {
     db.select().from(eosDecisionMemories).where(eq(eosDecisionMemories.ventureId, ventureId)),
     db.select().from(eosScenarioPreparations).where(eq(eosScenarioPreparations.ventureId, ventureId)),
     db.select().from(eosExternalSourceContracts).where(eq(eosExternalSourceContracts.ventureId, ventureId)),
+    db.select().from(eosExternalSourceConnections).where(eq(eosExternalSourceConnections.ventureId, ventureId)),
+    db.select().from(eosExternalAcquisitionRuns).where(eq(eosExternalAcquisitionRuns.ventureId, ventureId)),
+    db.select().from(eosExternalEvidenceRecords).where(eq(eosExternalEvidenceRecords.ventureId, ventureId)),
+    db.select().from(eosExternalEvidenceReviews).where(eq(eosExternalEvidenceReviews.ventureId, ventureId)),
     db.select().from(eosEvidenceLinks).where(eq(eosEvidenceLinks.ventureId, ventureId)),
   ]);
   const metricSourceNames = Array.from(new Set(intelligence.metrics.flatMap(metric => metric.evidence.map(item => item.source))));
@@ -47,6 +51,10 @@ export async function getEnterpriseKnowledgeGraph(ventureId: number) {
     ...decisionMemories.map(memory => ({ id: `DecisionMemory:${memory.id}`, kind: "decision_memory" as const, label: memory.title, status: memory.status, detail: `${memory.decisionKey} · expected outcome retained`, evidencePosture: "human_governed_decision_memory" })),
     ...scenarios.map(scenario => ({ id: `ScenarioPreparation:${scenario.id}`, kind: "scenario_preparation" as const, label: scenario.title, status: scenario.status, detail: `${scenario.scenarioType} · preparation only`, evidencePosture: "declared_assumptions_not_simulation" })),
     ...sourceContracts.map(contract => ({ id: `ExternalSourceContract:${contract.id}`, kind: "external_source_contract" as const, label: contract.name, status: contract.status, detail: `${contract.sourceCategory} · ${contract.collectionMode} · collection disabled`, evidencePosture: "source_contract_not_connected" })),
+    ...sourceConnections.map(connection => ({ id: `ExternalSourceConnection:${connection.id}`, kind: "external_source_connection" as const, label: `${connection.provider}:${connection.repositoryOwner}/${connection.repositoryName}`, status: connection.status, detail: `${connection.connectionKey} · ${connection.dataClassification} · server credential reference retained but not exposed`, evidencePosture: "tenant_scoped_external_connection_configuration" })),
+    ...acquisitionRuns.map(run => ({ id: `ExternalAcquisitionRun:${run.id}`, kind: "external_acquisition_run" as const, label: `${run.runKey} · ${run.status}`, status: run.status, detail: `Manual bounded acquisition · requested ${run.requestedAt.toISOString()}`, evidencePosture: "retained_external_acquisition_attempt" })),
+    ...externalEvidence.map(record => ({ id: `ExternalEvidence:${record.id}`, kind: "external_evidence_record" as const, label: `${record.resourceType}:${record.providerObjectId}`, status: record.validationPosture, detail: `Provider version ${record.sourceVersionHash.slice(0, 12)}… · received ${record.receivedAt.toISOString()}`, evidencePosture: "filtered_raw_external_evidence_with_normalized_projection" })),
+    ...externalReviews.map(review => ({ id: `ExternalEvidenceReview:${review.id}`, kind: "external_evidence_review" as const, label: `External evidence ${review.decision}`, status: review.decision, detail: `Separate human reviewer decision retained ${review.reviewedAt.toISOString()}`, evidencePosture: "retained_human_external_evidence_review" })),
     ...evidenceLinks.map(link => ({ id: `EvidenceLink:${link.id}`, kind: "evidence_link" as const, label: link.evidenceReference, status: link.posture, detail: `${link.evidenceType} → ${link.targetType}:${link.targetId}`, evidencePosture: "explicitly_retained_evidence_link" })),
   ];
   const nodeIds = new Set(nodes.map(node => node.id));
@@ -62,6 +70,10 @@ export async function getEnterpriseKnowledgeGraph(ventureId: number) {
     ...keyResults.map(result => ({ from: `KeyResult:${result.id}`, to: `StrategicObjective:${result.objectiveId}`, type: "governed_by" as const, detail: "Key result retains an explicit strategic-objective reference." })),
     ...keyResults.filter(result => result.metricKey).map(result => ({ from: `KeyResult:${result.id}`, to: `Metric:${result.metricKey}`, type: "references" as const, detail: "Key result retains the declared metric key; availability remains visible on the metric node." })),
     ...decisionMemories.filter(memory => memory.governanceCaseId).map(memory => ({ from: `DecisionMemory:${memory.id}`, to: `GovernanceDecision:${memory.governanceCaseId}`, type: "references" as const, detail: "Decision memory retains an explicit governance-case reference." })),
+    ...acquisitionRuns.map(run => ({ from: `ExternalAcquisitionRun:${run.id}`, to: `ExternalSourceConnection:${run.connectionId}`, type: "derived_from" as const, detail: "Manual acquisition run retains its exact source-connection reference." })),
+    ...externalEvidence.map(record => ({ from: `ExternalEvidence:${record.id}`, to: `ExternalAcquisitionRun:${record.acquisitionRunId}`, type: "derived_from" as const, detail: "External evidence retains its exact bounded acquisition-run reference." })),
+    ...externalEvidence.map(record => ({ from: `ExternalEvidence:${record.id}`, to: `ExternalSourceConnection:${record.connectionId}`, type: "evidenced_by" as const, detail: "External evidence retains its exact tenant-scoped source-connection reference." })),
+    ...externalReviews.map(review => ({ from: `ExternalEvidenceReview:${review.id}`, to: `ExternalEvidence:${review.evidenceRecordId}`, type: "governed_by" as const, detail: "Separate review retains its exact external-evidence record reference." })),
     ...evidenceLinks.map(link => ({ from: `EvidenceLink:${link.id}`, to: link.targetType === "objective" ? `StrategicObjective:${link.targetId}` : link.targetType === "key_result" ? `KeyResult:${link.targetId}` : link.targetType === "decision_memory" ? `DecisionMemory:${link.targetId}` : link.targetType === "scenario" ? `ScenarioPreparation:${link.targetId}` : `ExternalSourceContract:${link.targetId}`, type: "evidenced_by" as const, detail: "Retained evidence link points explicitly to this planning target." })),
     ...evidenceLinks.map(link => ({ from: `EvidenceLink:${link.id}`, to: link.evidenceReference, type: "references" as const, detail: "Evidence link reference is connected only when it exactly equals an existing graph node ID." })),
   ];
@@ -72,6 +84,6 @@ export async function getEnterpriseKnowledgeGraph(ventureId: number) {
     nodes,
     edges,
     summary: { nodeCount: nodes.length, edgeCount: edges.length, nodeKinds: kindCounts, metricNodeCount: intelligence.metrics.length, evidenceSourceNodeCount: metricSourceNames.length },
-    boundary: { readOnlyProjection: true as const, noGraphPersistence: true as const, noSourceMutation: true as const, noRelationshipInference: true as const, noCausalityClaim: true as const, noPrediction: true as const, noRecommendation: true as const, noDecisionExecution: true as const, noFinancialEffect: true as const, noPayrollEffect: true as const, noExternalIntegration: true as const, noExternalEffect: true as const },
+    boundary: { readOnlyProjection: true as const, noGraphPersistence: true as const, noSourceMutation: true as const, noRelationshipInference: true as const, noCausalityClaim: true as const, noPrediction: true as const, noRecommendation: true as const, noDecisionExecution: true as const, noFinancialEffect: true as const, noPayrollEffect: true as const, noExternalInvocation: true as const, noExternalEffect: true as const },
   };
 }

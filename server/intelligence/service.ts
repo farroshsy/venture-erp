@@ -13,6 +13,10 @@ import {
   erpSupplierMasterProfiles,
   erpWorkflowDefinitions,
   erpWorkflowTasks,
+  eosExternalAcquisitionRuns,
+  eosExternalEvidenceRecords,
+  eosExternalEvidenceReviews,
+  eosExternalSourceConnections,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
 
@@ -122,7 +126,7 @@ function collectionPlanFor(definition: MetricDefinition, observed: boolean): Met
 export async function getDecisionIntelligenceOverview(ventureId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available.");
-  const [records, balances, movements, workflowDefinitions, workflowTasks, auditEvents, employeeProfiles, projects, assets, serviceRequests, opportunities, itemProfiles, supplierProfiles] = await Promise.all([
+  const [records, balances, movements, workflowDefinitions, workflowTasks, auditEvents, employeeProfiles, projects, assets, serviceRequests, opportunities, itemProfiles, supplierProfiles, externalConnections, externalRuns, externalEvidenceRecords, externalEvidenceReviews] = await Promise.all([
     db.select().from(erpOperationalRecords).where(eq(erpOperationalRecords.ventureId, ventureId)),
     db.select().from(erpInventoryBalances).where(eq(erpInventoryBalances.ventureId, ventureId)),
     db.select().from(erpInventoryMovements).where(eq(erpInventoryMovements.ventureId, ventureId)),
@@ -136,6 +140,10 @@ export async function getDecisionIntelligenceOverview(ventureId: number) {
     db.select().from(erpCrmOpportunities).where(eq(erpCrmOpportunities.ventureId, ventureId)),
     db.select().from(erpItemMasterProfiles).where(eq(erpItemMasterProfiles.ventureId, ventureId)),
     db.select().from(erpSupplierMasterProfiles).where(eq(erpSupplierMasterProfiles.ventureId, ventureId)),
+    db.select().from(eosExternalSourceConnections).where(eq(eosExternalSourceConnections.ventureId, ventureId)),
+    db.select().from(eosExternalAcquisitionRuns).where(eq(eosExternalAcquisitionRuns.ventureId, ventureId)),
+    db.select().from(eosExternalEvidenceRecords).where(eq(eosExternalEvidenceRecords.ventureId, ventureId)),
+    db.select().from(eosExternalEvidenceReviews).where(eq(eosExternalEvidenceReviews.ventureId, ventureId)),
   ]);
   const invoices = records.filter(record => record.recordType === "payable_invoice" || record.recordType === "receivable_invoice");
   const postedPayments = records.filter(record => record.recordType === "payment_record" && ["posted", "fulfilled", "closed"].includes(record.status));
@@ -223,5 +231,21 @@ export async function getDecisionIntelligenceOverview(ventureId: number) {
     ...(workflowTasks.filter(task => task.status === "pending").length ? [{ id: "pending-human-tasks", level: "review" as const, title: "Pending human workflow tasks are retained", reason: `${workflowTasks.filter(task => task.status === "pending").length} tenant-scoped workflow task(s) remain pending.`, evidenceMetricKeys: ["operations.pending_workflow_tasks"], owner: "Operations leadership", confidence: "high", investigationRoute: "/automation", expectedImpact: "No task is approved, rejected, or completed by this signal." }] : []),
     ...categorySummaries.filter(category => category.observedMetrics === 0).slice(0, 3).map(category => ({ id: `coverage-${category.category}`, level: "coverage_gap" as const, title: `${category.label} lacks observed metric evidence`, reason: `No metrics in the ${category.label} category have a current retained-evidence computation.`, evidenceMetricKeys: [] as string[], owner: category.owner, confidence: "high", investigationRoute: "/intelligence", expectedImpact: category.collectionRequirement })),
   ].slice(0, 8);
-  return { model: { name: "Enterprise Decision Intelligence Layer", version: "0.2-executive-read-only", posture: "tenant_scoped_metric_catalog_with_observed_and_explicitly_unavailable_evidence", evaluatedAt }, executiveScorecard: metrics.filter(metric => metric.status === "observed").slice(0, 10), metrics, metricLedger, dependencyGraph, prioritySignals, categorySummaries, summary: { totalMetrics: metrics.length, statusCounts, observedMetricCount: statusCounts.observed, evidenceGapMetricCount: metrics.length - statusCounts.observed, sourceSummary: { operationalRecordCount: records.length, inventoryMovementCount: movements.length, auditEventCount: auditEvents.length, activeSupplierProfileCount: supplierProfiles.filter(profile => profile.status === "active").length } }, boundary: { readOnlyMetricEvaluation: true as const, responseOnlyMetricLedger: true as const, noMetricPersistence: true as const, noFinancialStatement: true as const, noValuationCalculation: true as const, noPaymentExecution: true as const, noJournalCreated: true as const, noPosting: true as const, noTaxCalculation: true as const, noPayrollCalculation: true as const, noFiling: true as const, noIntegrationTriggered: true as const, noAutonomousRecommendation: true as const, noExternalEffect: true as const } };
+  const latestExternalEvidence = externalEvidenceRecords.sort((left, right) => right.receivedAt.getTime() - left.receivedAt.getTime())[0] ?? null;
+  const reviewedExternalEvidenceCount = externalEvidenceRecords.filter(record => record.validationPosture === "reviewed").length;
+  const externalEvidenceReadiness = {
+    posture: externalConnections.length === 0 ? "not_connected" as const : externalConnections.some(connection => connection.status === "active") ? "manual_read_only_connection_active" as const : "connection_declared_not_active" as const,
+    provider: "github" as const,
+    connectionCount: externalConnections.length,
+    activeConnectionCount: externalConnections.filter(connection => connection.status === "active").length,
+    acquisitionRunCount: externalRuns.length,
+    completedOrPartialRunCount: externalRuns.filter(run => run.status === "completed" || run.status === "partial").length,
+    retainedEvidenceCount: externalEvidenceRecords.length,
+    reviewedEvidenceCount: reviewedExternalEvidenceCount,
+    latestReceivedAt: latestExternalEvidence?.receivedAt.toISOString() ?? null,
+    coverageInterpretation: "This is retained GitHub source evidence readiness only. It does not make an engineering, product, financial, payroll, security, or other metric observed; it does not establish source completeness, source accuracy, production behavior, business outcome, or decision quality.",
+    gaps: ["No automatic refresh, webhook, or scheduled incremental collection", "No source deletion workflow has been implemented", "No GitHub source field is mapped to canonical ERP truth or a metric formula", "Independent evidence review is required before an evidence record is marked reviewed"],
+    investigationRoute: "/external-evidence",
+  };
+  return { model: { name: "Enterprise Decision Intelligence Layer", version: "0.3-executive-read-only", posture: "tenant_scoped_metric_catalog_with_observed_and_explicitly_unavailable_evidence", evaluatedAt }, executiveScorecard: metrics.filter(metric => metric.status === "observed").slice(0, 10), metrics, metricLedger, dependencyGraph, prioritySignals, categorySummaries, externalEvidenceReadiness, summary: { totalMetrics: metrics.length, statusCounts, observedMetricCount: statusCounts.observed, evidenceGapMetricCount: metrics.length - statusCounts.observed, sourceSummary: { operationalRecordCount: records.length, inventoryMovementCount: movements.length, auditEventCount: auditEvents.length, activeSupplierProfileCount: supplierProfiles.filter(profile => profile.status === "active").length, externalEvidenceRecordCount: externalEvidenceRecords.length, externalEvidenceReviewCount: externalEvidenceReviews.length } }, boundary: { readOnlyMetricEvaluation: true as const, responseOnlyMetricLedger: true as const, noMetricPersistence: true as const, noFinancialStatement: true as const, noValuationCalculation: true as const, noPaymentExecution: true as const, noJournalCreated: true as const, noPosting: true as const, noTaxCalculation: true as const, noPayrollCalculation: true as const, noFiling: true as const, noIntegrationTriggered: true as const, noAutonomousRecommendation: true as const, noExternalEffect: true as const } };
 }

@@ -36,6 +36,8 @@ export const platformDocumentationIndex = [
   { id: "doc:enterprise-implementation", title: "Enterprise Platform Implementation Guide", summary: "Control-plane trade-offs, IAM and assistant operating cost, observability integration path, rollback posture, and multi-year roadmap.", path: "docs/architecture/ENTERPRISE-PLATFORM-IMPLEMENTATION.md" },
   { id: "doc:gate-1-production-hardening", title: "Gate 1 Production Hardening", summary: "Successive Gate 1–5 maturity roadmap, implemented request-time controls, local validation scope, recovery ownership, and exit evidence.", path: "docs/architecture/GATE-1-PRODUCTION-HARDENING-DESIGN.md" },
   { id: "doc:gate-2-adoption-validation", title: "Gate 2 Adoption and Operator Validation", summary: "Consent-aware human-recorded adoption-study protocol, role journeys, recovery guidance, separate review, and evidence required before a Gate 2 conclusion.", path: "docs/architecture/GATE-2-ADOPTION-VALIDATION-DESIGN.md" },
+  { id: "doc:gate-3-github-evidence", title: "Gate 3 GitHub Evidence Acquisition", summary: "Tenant-scoped GitHub source lifecycle, server-only credential reference, filtered raw/versioned evidence, manual bounded acquisition, separate review, retention/revocation controls, and exit evidence still required.", path: "docs/architecture/GATE-3-GITHUB-EVIDENCE-ACQUISITION-DESIGN.md" },
+  { id: "doc:gate-3-github-runbook", title: "Gate 3 GitHub Evidence Runbook", summary: "Safe source validation, separate authorization, explicit activation, one-page acquisition, provider-rate-limit handling, provenance review, revocation, and deferred webhook/scheduling controls.", path: "docs/platform/GATE-3-GITHUB-EVIDENCE-RUNBOOK.md" },
   { id: "doc:control-plane-design", title: "Platform Control Plane Design", summary: "Source-of-truth rules, assistant retrieval policy, authorization boundaries, and dashboard truthfulness constraints.", path: "docs/architecture/PLATFORM-CONTROL-PLANE-DESIGN.md" },
 ];
 
@@ -100,12 +102,13 @@ export function getArchitectureGovernance() {
       { name: "Operational readiness", status: "governed", detail: "L3 requires scorecard evidence, runbook, rollback, and deployment verification." },
       { name: "Gate 1 request-time hardening", status: "implemented", detail: "Correlation IDs, bounded completion logs, liveness/readiness, browser-facing headers, and per-process API rate-limit refusal are implemented; SLOs, alerts, and recovery drills remain unmeasured." },
       { name: "Gate 2 adoption validation protocol", status: "implemented", detail: "Role-aware guidance, bounded journeys/recovery explanations, consent-confirmed pseudonymous observations, and separate study/observation review are implemented; real independent-sample exit evidence remains unmeasured." },
+      { name: "Gate 3 GitHub external evidence", status: "implemented", detail: "One tenant-scoped GitHub source can be drafted, server-validated, separately authorized, explicitly activated, manually acquired in bounded pages, retained as filtered/versioned evidence, separately reviewed, and revoked; no webhook, scheduler, automatic retry, source deletion, ERP-truth mapping, or outcome claim is enabled." },
       { name: "Evidence-bounded AI", status: "enforced", detail: "Architecture assistant receives authorized platform evidence only and cannot act." },
     ],
     roadmap: [
       { stage: "Gate 1", title: "Production hardening", detail: "Build evidence for reliability, security, recovery, performance, integrity, and operating ownership before extending data or AI surfaces." },
       { stage: "Gate 2", title: "Adoption", detail: "Use human-reviewed evidence to establish that independent users can safely complete real authorized workflows." },
-      { stage: "Gate 3", title: "Integrations and data acquisition", detail: "Connect governed systems of record only after hardening/adoption evidence supports monitored provenance, failure visibility, and replay." },
+      { stage: "Gate 3", title: "Integrations and data acquisition", detail: "The first governed GitHub read-only evidence source is implemented with source lifecycle/provenance/review controls; independently reviewed real acquisition, freshness/coverage, revocation, retention/deletion, and operating evidence remain required before the gate can be considered passed." },
       { stage: "Gate 4", title: "AI and decision intelligence", detail: "Enable evidence-grounded retrieval only after source, authorization, provenance, privacy, and human-review controls are proven." },
       { stage: "Gate 5", title: "Commercialization", detail: "Make customer-facing commitments only after operating and adoption evidence justifies them." },
     ],

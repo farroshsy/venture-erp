@@ -36,6 +36,7 @@ const navigation = [
   { path: "/validation", label: "Validation program", icon: ClipboardCheck },
   { path: "/reliability", label: "Operations reliability", icon: ShieldCheck },
   { path: "/adoption", label: "Adoption validation", icon: Users },
+  { path: "/external-evidence", label: "External evidence", icon: Globe2 },
   { path: "/automation", label: "Automation workbench", icon: GitBranch },
   { path: "/asia", label: "Asia operations", icon: Globe2 },
   { path: "/cross-border", label: "Cross-border finance", icon: ArrowRightLeft },
