@@ -4,6 +4,20 @@
 
 > The governing position is deliberate: **microservices are the target operating model; a service-aligned foundation is the starting implementation.** This preserves independent module evolution without manufacturing operational complexity before the portfolio has earned it.
 
+## Live workspace and release posture
+
+The managed Venture ERP workspace is available at **[ventureerp-ax3cnpay.manus.space](https://ventureerp-ax3cnpay.manus.space)**. The live application requires an authorized session and an active venture membership; it is not a public financial-reporting, payroll, tax, payment, or government-filing service.
+
+> **Evidence-first release posture.** This repository deliberately distinguishes implemented, retained-evidence controls from planned or separately authorized financial capabilities. A visible workspace, route, record, or roadmap item is not a claim of statutory compliance, SAP parity, production accounting authority, live integration, or automatic financial effect.
+
+| Start here | Purpose |
+| --- | --- |
+| [Live workspace](https://ventureerp-ax3cnpay.manus.space) | Use the tenant-scoped control workspace with a valid authorized session. |
+| [Workspace Guide](https://ventureerp-ax3cnpay.manus.space/guide) | Read practical intent, navigation, expected outcomes, and boundaries for the active modules. |
+| [Documentation hub](docs/README.md) | Navigate architecture records, ADRs, research, compliance gates, validation notes, and the supported operating model. |
+| [CREB design](docs/architecture/CANONICAL-RESOURCE-EVIDENCE-BRIDGE-DESIGN.md) | Review the active read-only Resource evidence projection, reconciliation semantics, gaps, and no-effect boundary. |
+| [COEB roadmap](docs/architecture/CANONICAL-OBLIGATION-EVIDENCE-BRIDGE-ROADMAP.md) | Review the authorized but not yet implemented Obligation evidence-bridge scope. |
+
 ## What is implemented
 
 The delivered workspace includes a venture-scoped portfolio dashboard, an executive architecture dashboard, interactive architecture governance, a full platform service catalog, operations panels for Finance, Procurement, Inventory, People, and Project Operations, a build-versus-buy workbench, an evidence-bounded architecture assistant, and a venture/module access-administration workspace. It persists ventures, memberships, governance cases, AI evidence-review drafts, role templates, permissions, scoped assignments, access-change records, and assistant conversation evidence in the database. It also contains versioned public contracts, ADRs, service maturity scorecards, contract validation, CI quality gates, and tenant-isolation integration tests.
@@ -12,7 +26,9 @@ The delivered workspace includes a venture-scoped portfolio dashboard, an execut
 |---|---|---|
 | **Venture platform kernel** | Creates ventures, memberships, active scope selection, and portfolio visibility. | Every venture-scoped API checks an active membership; cross-venture records are never queried by a caller outside its membership set. |
 | **Service catalog** | Shows owner, contract, data authority, release, health, deployment posture, and maturity per context. | Catalog metadata is a control-plane read model, not an operational system of record. |
-| **Initial ERP workspaces** | Provides finance, procurement, inventory, people, and project operating controls. | Domain commands remain scoped to the bounded context and are not allowed to write another context’s database. |
+| **Operational ERP workspaces** | Provides controlled finance, procurement, inventory, sales, people, delivery/assets, service/CRM, work, cash, automation, Asia, and operational-insight workspaces. | Domain commands remain scoped to the bounded context; live payment execution, statutory filing, external transmission, and unreviewed payroll activation are unavailable. |
+| **Canonical evidence projections** | Provides CFOM discovery, a semantic evidence-gap/readiness register, canonical item/supplier profiles, and the inventory-only Canonical Resource Evidence Bridge (CREB). | These are tenant-scoped read models. CREB does not create a second inventory ledger, adjust balances, convert units, value inventory, calculate COGS, or post accounting. |
+| **Costing Engine evidence controls** | Retains finance-owned effective-dated policy revisions, immutable layers, deterministic allocation evidence, and read-only valuation previews. | Evidence is not a financial effect: no layer consumption, inventory revaluation, COGS, journal/GL, tax, payroll, payment, filing, or external action is activated. |
 | **Decision governance** | Scores SAP, alternative ERP, and custom delivery using declared criteria and weights. | The score is transparent decision support, not an automatic procurement recommendation. |
 | **AI evidence review** | Produces a structured summary, assumptions, gaps, and risks from user-supplied evidence. | The server forces `humanApprovalRequired = true`; only authorized people can approve a review. |
 | **Executive architecture dashboard** | Shows platform scorecards, governance evidence by venture, lifecycle, dependencies, technical debt, risks, and readiness. | Metrics without connected delivery/observability sources remain explicitly marked as integration-needed. |
@@ -73,6 +89,7 @@ server/
   governance/             # Decision scoring and AI approval policy
   assistant/              # Read-only evidence retrieval and model synthesis
   iam/                    # Roles, permissions, scoped assignment and effective-permission policy
+  erp/                    # Tenant-scoped operational, finance-evidence, costing, and canonical-projection services
   routers/                # Typed API contracts for platform, governance, assistant, and IAM contexts
   _core/                  # Managed runtime infrastructure (do not change casually)
 
@@ -82,6 +99,7 @@ drizzle/
 
 contracts/public/         # Versioned public service contracts
 docs/
+  README.md               # Documentation hub and truthful capability map
   adr/                    # Architecture Decision Records
   architecture/           # Context boundaries and migration roadmap
   platform/               # Standards, maturity, scorecards, validation notes
@@ -91,11 +109,13 @@ infra/                    # Infrastructure-as-code direction and deployment expe
 scripts/                  # Contract and foundation verification
 ```
 
-## Enterprise finance research roadmap
+## Evidence-bridge roadmap and enterprise finance research
 
 The user-supplied institutional-finance roadmap is preserved in [`docs/research/ENTERPRISE-FINANCE-AND-OPERATIONS-ROADMAP.md`](docs/research/ENTERPRISE-FINANCE-AND-OPERATIONS-ROADMAP.md). It prioritizes governed inventory valuation/cost accounting, deterministic COGS/margins, fixed assets, treasury, an Investment Book of Record, formal reporting, budgeting, manufacturing, supply chain, and an evidence-bounded AI finance copilot.
 
-The roadmap is an **input to architecture decisions**, not a claim that these engines are active. The implemented first step is an evidence-only **Costing Engine foundation** at `/costing`: finance-owned effective-dated policy revisions, immutable receipt cost layers, deterministic landed-cost allocation evidence, read-only valuation previews, and invariant reports. It is deliberately separate from journals and balances. Each financial capability must still be separately authorized, finance-owned, effective-dated, tenant-scoped, evidence-backed, independently validated, and tested before activation. The workspace does not create COGS, inventory revaluation, revenue recognition, capitalization/depreciation, investment calculation, payment execution, tax/payroll determination, filing, external transmission, accounting-control posting, or formal financial statements. Indonesian payroll remains draft-only until a qualified Indonesian payroll/tax reviewer gives written, effective-dated approval.
+The roadmap is an **input to architecture decisions**, not a claim that these engines are active. The implemented first step is an evidence-only **Costing Engine foundation** at `/costing`: finance-owned effective-dated policy revisions, immutable receipt cost layers, deterministic landed-cost allocation evidence, read-only valuation previews, and invariant reports. It is deliberately separate from journals and balances. The active inventory-only **Canonical Resource Evidence Bridge (CREB)** makes retained profile, movement, balance, document, declared source-fact, accounting-evidence, Costing Engine, and exact finance-dimension evidence reviewable under a canonical `Resource:{itemMasterId}` vocabulary. It returns only reconciled, exception, or insufficient-evidence status and never corrects a record.
+
+The next separately authorized non-payroll roadmap item is documented as the **Canonical Obligation Evidence Bridge (COEB)**. It is **not implemented**: there is no COEB table, service, router, UI, reconciliation run, correction path, journal behavior, or external effect. Its proposed read-only scope and gating conditions are preserved in [the COEB roadmap record](docs/architecture/CANONICAL-OBLIGATION-EVIDENCE-BRIDGE-ROADMAP.md) for review before any code work begins. Each financial capability must still be separately authorized, finance-owned, effective-dated, tenant-scoped, evidence-backed, independently validated, and tested before activation. The workspace does not create COGS, inventory revaluation, revenue recognition, capitalization/depreciation, investment calculation, payment execution, tax/payroll determination, filing, external transmission, accounting-control posting, or formal financial statements. Indonesian payroll remains draft-only until a qualified Indonesian payroll/tax reviewer gives written, effective-dated approval.
 
 ## Using the workspace safely
 
@@ -117,7 +137,7 @@ pnpm verify:foundation
 pnpm build
 ```
 
-The current implementation validated `pnpm check`, `pnpm build`, all Vitest suites, integration suites, the public-contract validator, and the foundation verifier. Before a production release, run the deployed health probe and a contract smoke suite against the target environment as described in `docs/platform/ENGINEERING-STANDARDS.md`.
+The current implementation validated `pnpm check`, `pnpm build`, all Vitest suites, integration suites, the public-contract validator, and the foundation verifier. The latest completed CREB quality gate recorded **94 tests** under `pnpm test` and **25 tests** under `pnpm test:integration`; see [Validation Notes](docs/platform/VALIDATION-NOTES.md) for the exact command outcomes and scope. Before a production release, run the deployed health probe and a contract smoke suite against the target environment as described in `docs/platform/ENGINEERING-STANDARDS.md`.
 
 ## Service maturity and extraction gates
 

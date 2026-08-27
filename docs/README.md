@@ -1,0 +1,45 @@
+# Venture ERP Documentation Hub
+
+This directory is the durable companion to the [Venture ERP workspace](https://ventureerp-ax3cnpay.manus.space). It records **what is implemented, what is deliberately unavailable, the retained evidence model, validation outcomes, and the conditions that must be met before a future capability can be considered**. It is not a substitute for qualified legal, tax, accounting, payroll, or regulatory advice.
+
+## Read this first
+
+| Document | When to use it | What it establishes |
+| --- | --- | --- |
+| [Repository README](../README.md) | You are new to the project. | Live workspace link, architecture posture, capability summary, development commands, and operating boundaries. |
+| [Workspace Guide](https://ventureerp-ax3cnpay.manus.space/guide) | You need in-product navigation and practical scenarios. | Intent, expected outcome, and active exclusion for each workspace. |
+| [Validation Notes](platform/VALIDATION-NOTES.md) | You need verified change evidence. | Actual test, integration, contract, foundation, build, and responsive-review outcomes by increment. |
+| [Engineering Standards](platform/ENGINEERING-STANDARDS.md) | You are preparing a contribution or release. | Quality gates, contract checks, safe database evolution, and release expectations. |
+| [Service Maturity](platform/SERVICE-MATURITY.md) | You are assessing extraction or release posture. | L0–L3 maturity criteria and the evidence required for service independence. |
+
+## Architecture and decision records
+
+The architecture records describe the service-aligned modular-monolith strategy, bounded contexts, data ownership, migration readiness, and narrow evidence-first capability increments. Architecture documents explain the intended design; they do not enable a control that has not been implemented and validated.
+
+| Area | Primary records |
+| --- | --- |
+| Platform strategy | [Bounded Contexts](architecture/BOUNDED-CONTEXTS.md), [Migration Roadmap](architecture/MIGRATION-ROADMAP.md), [Enterprise Platform Implementation](architecture/ENTERPRISE-PLATFORM-IMPLEMENTATION.md) |
+| Governed finance evidence | [Accounting Event and Posting Control](architecture/ACCOUNTING-EVENT-POSTING-CONTROL-DESIGN.md), [Controlled Finance Reporting](architecture/CONTROLLED-FINANCE-REPORTING-DESIGN.md), [Read-Only Ledger Simulation](architecture/READ-ONLY-LEDGER-SIMULATION-DESIGN.md) |
+| Canonical evidence layer | [CFOM Read Projection](architecture/CANONICAL-FINANCIAL-OBJECT-MODEL-READ-PROJECTION-DESIGN.md), [Semantic Evidence-Gap Register](architecture/SEMANTIC-EVIDENCE-GAP-READINESS-REGISTER-DESIGN.md), [CREB](architecture/CANONICAL-RESOURCE-EVIDENCE-BRIDGE-DESIGN.md), [COEB Roadmap](architecture/CANONICAL-OBLIGATION-EVIDENCE-BRIDGE-ROADMAP.md) |
+| Inventory and costing | [Costing Engine Foundation](architecture/COSTING-ENGINE-FOUNDATION-DESIGN.md), [Valuation Review](architecture/READ-ONLY-INVENTORY-VALUATION-REVIEW-DESIGN.md), [Canonical Item Profile](architecture/CANONICAL-ITEM-MASTER-PROFILE-DESIGN.md) |
+| Operating controls | [Invoice-to-Payment Control](architecture/INVOICE-TO-PAYMENT-CONTROL-DESIGN.md), [Visual Automation Workbench](architecture/VISUAL-AUTOMATION-WORKBENCH-DESIGN.md), [Asia Operating Coverage](architecture/ASIA-OPERATING-COVERAGE-AND-ROLLOUT.md) |
+| Decisions | [Architecture Decision Records](adr/) |
+
+## Capability truth register
+
+| Capability | Current posture | Do not infer |
+| --- | --- | --- |
+| Inventory operations and CREB | Tenant-scoped retained operational evidence and a read-only Resource projection. | A second inventory ledger, automatic correction, unit conversion, inventory valuation, or COGS. |
+| Procurement, sales, invoices, aging, three-way match, and internal payment records | Controlled internal records and evidence; matching/aging are retained-evidence views. | Payment execution, collections, supplier communication, shipment, or external settlement. |
+| Accounting evidence, journal proposals, and reporting | Immutable evidence and controlled read/proposal paths are present. | Automatic posting, an authoritative general ledger, formal financial statements, or statutory reporting. |
+| Costing Engine | Immutable layers and deterministic, read-only evidence/preview controls are present. | Financial valuation, layer consumption, COGS, or accounting effects. |
+| Payroll and tax | Indonesia candidate-source evidence pack is retained. | Qualified review, calculated payroll, compliance validation, filing, or production use. |
+| COEB | Authorized future roadmap and documentation only. | A canonical payable/receivable/commitment table, implementation, reconciler, correction path, or treasury function. |
+
+## Contribution and review path
+
+Read the related architecture record before changing a bounded context. Make additive, tenant-scoped, evidence-backed changes; write focused tests; run `pnpm check`, `pnpm test`, `pnpm test:integration`, `pnpm contracts:validate`, `pnpm verify:foundation`, and `pnpm build`; record actual results in Validation Notes; then save a reviewable checkpoint. Schema changes require a Drizzle migration, reviewed TiDB-safe SQL, application, and physical verification before any capability may claim persistence support.
+
+## Payroll gate
+
+The Indonesian payroll evidence pack is **draft-only, inactive, unreviewed, unselected, and blocked**. No payroll calculation, rehearsal, activation, production use, payment, compliance assertion, or statutory filing can be represented until a qualified Indonesian payroll/tax reviewer provides a written, effective-dated review identifying the exact source versions, approved worker scope, supported payroll cadence, limitations, and explicit authorization. See [Indonesia Payroll Draft Evidence Pack](compliance/INDONESIA-PAYROLL-DRAFT-EVIDENCE-PACK.md).
