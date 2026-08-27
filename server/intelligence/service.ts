@@ -92,6 +92,33 @@ export const metricCatalog: MetricDefinition[] = Object.entries(rawCatalog).flat
 
 type ObservedMetric = { value: number; evidence: Array<{ source: string; recordCount: number }>; formula: string; detail?: string };
 
+type MetricCollectionPlan = {
+  status: "evidence_available" | "requires_internal_model" | "requires_external_source_contract" | "requires_human_governance";
+  requiredServices: string[];
+  requiredTablesOrContracts: string[];
+  requiredEventsOrInputs: string[];
+  requiredIntegrations: string[];
+  requiredOwner: string;
+  validationGate: string;
+  complexityBand: "low" | "medium" | "high";
+  deliveryEstimate: "not_estimated_without_approved_scope_and_capacity";
+};
+
+function collectionPlanFor(definition: MetricDefinition, observed: boolean): MetricCollectionPlan {
+  if (observed) return { status: "evidence_available", requiredServices: ["Enterprise Decision Intelligence"], requiredTablesOrContracts: definition.requiredEvidence, requiredEventsOrInputs: ["Existing tenant-scoped retained evidence"], requiredIntegrations: [], requiredOwner: definition.owner, validationGate: "Re-run tenant-scoped request-time evaluation and verify metric formula/lineage against retained source rows.", complexityBand: "low", deliveryEstimate: "not_estimated_without_approved_scope_and_capacity" };
+  const externalCategories: MetricCategory[] = ["engineering", "ai", "marketing", "security_compliance", "marketplace"];
+  const humanGovernedCategories: MetricCategory[] = ["company_value", "finance", "investor"];
+  const status = externalCategories.includes(definition.category) ? "requires_external_source_contract" : humanGovernedCategories.includes(definition.category) ? "requires_human_governance" : "requires_internal_model";
+  const integrationByCategory: Partial<Record<MetricCategory, string[]>> = {
+    engineering: ["Approved CI/CD, incident, observability, and infrastructure-cost read-only source contract"], ai: ["Privacy-reviewed AI telemetry source contract"], marketing: ["Consent-aware campaign and attribution read-only source contract"], security_compliance: ["Approved security, vulnerability, audit, and incident source contract"], marketplace: ["Marketplace listing/order/fulfillment source contract"],
+  };
+  const eventsByCategory: Partial<Record<MetricCategory, string[]>> = {
+    growth: ["Period-aligned recurring revenue and customer-cohort events"], sales: ["Lead, qualification, opportunity, proposal, and close lifecycle events"], customer_success: ["Contract, renewal, cancellation, support, and feedback events"], product: ["Privacy-reviewed product interaction events with consent state"], saas: ["Subscription, seat, billing, upgrade, downgrade, and refund lifecycle events"], people: ["Jurisdiction-aware, consented people-lifecycle and learning events"], company_value: ["Approved finance, capitalization, policy, and valuation evidence"], finance: ["Separately governed ledger, cash, debt, revenue-recognition, and statement evidence"], investor: ["Approved market, capitalization, concentration, expansion, cash, and defensibility evidence"],
+  };
+  const complexityBand = ["company_value", "finance", "investor", "security_compliance", "ai"].includes(definition.category) ? "high" : externalCategories.includes(definition.category) ? "high" : "medium";
+  return { status, requiredServices: ["Enterprise Decision Intelligence", `${categoryMetadata[definition.category].label} source owner`], requiredTablesOrContracts: definition.requiredEvidence, requiredEventsOrInputs: eventsByCategory[definition.category] ?? ["Versioned source fields and lifecycle timestamps required by the metric formula"], requiredIntegrations: integrationByCategory[definition.category] ?? [], requiredOwner: definition.owner, validationGate: "Approve a versioned source contract, define formula/time grain/identity rules, validate tenant scope and missing-data behavior, then add focused calculation and lineage tests.", complexityBand, deliveryEstimate: "not_estimated_without_approved_scope_and_capacity" };
+}
+
 export async function getDecisionIntelligenceOverview(ventureId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available.");
@@ -144,7 +171,10 @@ export async function getDecisionIntelligenceOverview(ventureId: number) {
     const status = observation ? "observed" as const : definition.preferredStatus;
     const confidence = status === "observed" ? "high" : status === "partially_supported" ? "limited" : "unavailable";
     const missingEvidence = status === "observed" ? [] : definition.requiredEvidence;
-    return { ...definition, status, confidence, value: observation?.value ?? null, valueDisplay: observation ? observation.value.toLocaleString() : "Unavailable — evidence not modeled", formula: observation?.formula ?? definition.formula, evidence: observation?.evidence ?? [], missingEvidence, lineage: [{ stage: "metric_definition", detail: `${definition.key} · owner: ${definition.owner}` }, { stage: "formula", detail: observation?.formula ?? definition.formula }, { stage: "evidence", detail: observation ? observation.evidence.map(item => `${item.source} (${item.recordCount})`).join("; ") : missingEvidence.join("; ") }, { stage: "source_contract", detail: observation ? "Tenant-scoped retained evidence queried at request time." : definition.collectionRequirement }], collectionRequirement: definition.collectionRequirement, detail: observation?.detail ?? null, lastEvaluatedAt: evaluatedAt, readiness: { formulaModeled: status !== "not_modeled", requiredEvidenceAvailable: status === "observed", safeToCompute: status === "observed", futureAutomationEligible: false, blocked: status !== "observed" } };
+    const collectionPlan = collectionPlanFor(definition, Boolean(observation));
+    const quality = observation ? { status: "structural_checks_passed" as const, checks: ["Active tenant scope applied", "Request-time retained source rows counted", "Unavailable formulas not estimated", ...(definition.observedKey === "inventory_balances" ? ["Declared units not normalized or aggregated"] : [])], limitations: observation.detail ? [observation.detail] : [] } : { status: "not_evaluable" as const, checks: ["No metric value emitted without the required evidence contract"], limitations: missingEvidence };
+    const freshness = observation ? { status: "evaluated_at_request_time" as const, evaluatedAt, sourceTimestampStatus: "source_row_timestamps_not_normalized_into_metric_freshness" as const, freshnessSla: "not_modeled" as const } : { status: "not_evaluable" as const, evaluatedAt, sourceTimestampStatus: "required_source_contract_not_available" as const, freshnessSla: "not_modeled" as const };
+    return { ...definition, status, confidence, value: observation?.value ?? null, valueDisplay: observation ? observation.value.toLocaleString() : "Unavailable — evidence not modeled", formula: observation?.formula ?? definition.formula, evidence: observation?.evidence ?? [], missingEvidence, lineage: [{ stage: "metric_definition", detail: `${definition.key} · owner: ${definition.owner} · version ${definition.definitionVersion} effective ${definition.effectiveFrom}` }, { stage: "formula", detail: observation?.formula ?? definition.formula }, { stage: "evidence", detail: observation ? observation.evidence.map(item => `${item.source} (${item.recordCount})`).join("; ") : missingEvidence.join("; ") }, { stage: "source_contract", detail: observation ? "Tenant-scoped retained evidence queried at request time." : definition.collectionRequirement }, { stage: "validation", detail: quality.checks.join("; ") }], collectionRequirement: definition.collectionRequirement, collectionPlan, freshness, quality, detail: observation?.detail ?? null, lastEvaluatedAt: evaluatedAt, readiness: { availability: status === "observed" ? "available" as const : status === "partially_supported" ? "requires_internal_model" as const : "unavailable" as const, formulaModeled: status !== "not_modeled", requiredEvidenceAvailable: status === "observed", safeToCompute: status === "observed", needsHumanInput: collectionPlan.status === "requires_human_governance", needsExternalSource: collectionPlan.status === "requires_external_source_contract", futureAutomationEligible: false, blocked: status !== "observed" } };
   });
   const statusCounts = metrics.reduce<Record<MetricStatus, number>>((counts, metric) => { counts[metric.status] += 1; return counts; }, { observed: 0, partially_supported: 0, blocked: 0, not_modeled: 0 });
   const categorySummaries = (Object.keys(categoryMetadata) as MetricCategory[]).map(category => ({ category, label: categoryMetadata[category].label, question: categoryMetadata[category].question, owner: categoryMetadata[category].owner, totalMetrics: metrics.filter(metric => metric.category === category).length, observedMetrics: metrics.filter(metric => metric.category === category && metric.status === "observed").length, blockedOrUnmodeledMetrics: metrics.filter(metric => metric.category === category && metric.status !== "observed").length, collectionRequirement: categoryMetadata[category].collectionRequirement }));

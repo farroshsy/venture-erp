@@ -33,6 +33,8 @@ const OperationsWorkspace = lazy(() => import("./pages/OperationsWorkspace"));
 const PortfolioDashboard = lazy(() => import("./pages/PortfolioDashboard"));
 const WorkspaceGuide = lazy(() => import("./pages/WorkspaceGuide"));
 const DecisionIntelligence = lazy(() => import("./pages/DecisionIntelligence"));
+const KnowledgeGraph = lazy(() => import("./pages/KnowledgeGraph"));
+const OperatingSystem = lazy(() => import("./pages/OperatingSystem"));
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -64,6 +66,8 @@ function Router() {
       <Route path={"/architecture"} component={Architecture} />
       <Route path={"/guide"} component={WorkspaceGuide} />
       <Route path={"/intelligence"} component={DecisionIntelligence} />
+      <Route path={"/knowledge-graph"} component={KnowledgeGraph} />
+      <Route path={"/operating-system"} component={OperatingSystem} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

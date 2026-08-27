@@ -23,6 +23,7 @@ The architecture records describe the service-aligned modular-monolith strategy,
 | Canonical evidence layer | [CFOM Read Projection](architecture/CANONICAL-FINANCIAL-OBJECT-MODEL-READ-PROJECTION-DESIGN.md), [Semantic Evidence-Gap Register](architecture/SEMANTIC-EVIDENCE-GAP-READINESS-REGISTER-DESIGN.md), [CREB](architecture/CANONICAL-RESOURCE-EVIDENCE-BRIDGE-DESIGN.md), [COEB Design](architecture/CANONICAL-OBLIGATION-EVIDENCE-BRIDGE-DESIGN.md), [COEB Roadmap Decision](architecture/CANONICAL-OBLIGATION-EVIDENCE-BRIDGE-ROADMAP.md) |
 | Decision intelligence | [Enterprise Decision Intelligence Layer](architecture/ENTERPRISE-DECISION-INTELLIGENCE-DESIGN.md) |
 | Executive evidence cockpit | [Executive Evidence Cockpit and Metric Ledger](architecture/EXECUTIVE-EVIDENCE-COCKPIT-DESIGN.md) |
+| Enterprise Operating System intelligence | [Integrated Operating System Intelligence](architecture/ENTERPRISE-OPERATING-SYSTEM-INTELLIGENCE-DESIGN.md) — Knowledge Graph, governed metric quality/readiness, human objectives/KRs/decision memory, scenario preparation, evidence links, source-contract and copilot readiness. |
 | Inventory and costing | [Costing Engine Foundation](architecture/COSTING-ENGINE-FOUNDATION-DESIGN.md), [Valuation Review](architecture/READ-ONLY-INVENTORY-VALUATION-REVIEW-DESIGN.md), [Canonical Item Profile](architecture/CANONICAL-ITEM-MASTER-PROFILE-DESIGN.md) |
 | Operating controls | [Invoice-to-Payment Control](architecture/INVOICE-TO-PAYMENT-CONTROL-DESIGN.md), [Visual Automation Workbench](architecture/VISUAL-AUTOMATION-WORKBENCH-DESIGN.md), [Asia Operating Coverage](architecture/ASIA-OPERATING-COVERAGE-AND-ROLLOUT.md) |
 | Decisions | [Architecture Decision Records](adr/) |
@@ -38,6 +39,7 @@ The architecture records describe the service-aligned modular-monolith strategy,
 | Payroll and tax | Indonesia candidate-source evidence pack is retained. | Qualified review, calculated payroll, compliance validation, filing, or production use. |
 | COEB | Tenant-scoped, read-only retained-evidence projection for invoices and commitments in Cash Control. | A payable/receivable/commitment system of record, automatic correction, payment execution, journal/posting, treasury function, or external settlement. |
 | Enterprise Decision Intelligence | Tenant-scoped, request-time, read-only metric catalog with 219 visible definitions, observed evidence-backed values, lineage, and data-gap collection paths. | A data warehouse, third-party collector, telemetry pipeline, scheduled refresh, financial statement, valuation, recommendation engine, autonomous action, or external transmission. |
+| Enterprise Operating System intelligence | Tenant-scoped Knowledge Graph plus human-governed planning, decision-memory, scenario, explicit evidence-link, and source-contract readiness records. | Inferred relationships or causality, forecast/scenario computation, AI invocation, external collection, recommendation/decision execution, capital allocation, posting, payment, payroll, tax, filing, or external effects. |
 
 ## Contribution and review path
 
