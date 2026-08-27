@@ -5,7 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { RouteGuide } from "@/components/RouteGuide";
 import { cn } from "@/lib/utils";
-import { Activity, ArrowRightLeft, BookOpenCheck, Boxes, BriefcaseBusiness, Calculator, ChevronDown, Factory, FileSearch, Flag, GitBranch, Globe2, Grid2X2, KeyRound, Landmark, LayoutDashboard, LogOut, MessageSquareText, Moon, Network, PanelLeftClose, PanelLeftOpen, Scale, ScrollText, Share2, ShieldCheck, ShoppingCart, Sun, Users, Workflow } from "lucide-react";
+import { Activity, ArrowRightLeft, BookOpenCheck, Boxes, BriefcaseBusiness, Calculator, ChevronDown, ClipboardCheck, Factory, FileSearch, Flag, GitBranch, Globe2, Grid2X2, KeyRound, Landmark, LayoutDashboard, LogOut, MessageSquareText, Moon, Network, PanelLeftClose, PanelLeftOpen, Scale, ScrollText, Share2, ShieldCheck, ShoppingCart, Sun, Users, Workflow } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
@@ -33,6 +33,7 @@ const navigation = [
   { path: "/intelligence", label: "Enterprise intelligence", icon: Activity },
   { path: "/knowledge-graph", label: "Knowledge graph", icon: Share2 },
   { path: "/operating-system", label: "Operating system", icon: Flag },
+  { path: "/validation", label: "Validation program", icon: ClipboardCheck },
   { path: "/automation", label: "Automation workbench", icon: GitBranch },
   { path: "/asia", label: "Asia operations", icon: Globe2 },
   { path: "/cross-border", label: "Cross-border finance", icon: ArrowRightLeft },

@@ -4,6 +4,7 @@ import { requireVentureMembership } from "../platform/tenant";
 import { getDecisionIntelligenceOverview } from "../intelligence/service";
 import { getEnterpriseKnowledgeGraph } from "../intelligence/knowledgeGraph";
 import { operatingSystemRouter } from "./operatingSystem";
+import { validationProgramRouter } from "./validationProgram";
 
 export const intelligenceRouter = router({
   overview: protectedProcedure.input(z.object({ ventureId: z.number().int().positive() })).query(async ({ ctx, input }) => {
@@ -15,4 +16,5 @@ export const intelligenceRouter = router({
     return getEnterpriseKnowledgeGraph(input.ventureId);
   }),
   operatingSystem: operatingSystemRouter,
+  validationProgram: validationProgramRouter,
 });
