@@ -21,6 +21,7 @@ The architecture records describe the service-aligned modular-monolith strategy,
 | Platform strategy | [Bounded Contexts](architecture/BOUNDED-CONTEXTS.md), [Migration Roadmap](architecture/MIGRATION-ROADMAP.md), [Enterprise Platform Implementation](architecture/ENTERPRISE-PLATFORM-IMPLEMENTATION.md) |
 | Governed finance evidence | [Accounting Event and Posting Control](architecture/ACCOUNTING-EVENT-POSTING-CONTROL-DESIGN.md), [Controlled Finance Reporting](architecture/CONTROLLED-FINANCE-REPORTING-DESIGN.md), [Read-Only Ledger Simulation](architecture/READ-ONLY-LEDGER-SIMULATION-DESIGN.md) |
 | Canonical evidence layer | [CFOM Read Projection](architecture/CANONICAL-FINANCIAL-OBJECT-MODEL-READ-PROJECTION-DESIGN.md), [Semantic Evidence-Gap Register](architecture/SEMANTIC-EVIDENCE-GAP-READINESS-REGISTER-DESIGN.md), [CREB](architecture/CANONICAL-RESOURCE-EVIDENCE-BRIDGE-DESIGN.md), [COEB Design](architecture/CANONICAL-OBLIGATION-EVIDENCE-BRIDGE-DESIGN.md), [COEB Roadmap Decision](architecture/CANONICAL-OBLIGATION-EVIDENCE-BRIDGE-ROADMAP.md) |
+| Decision intelligence | [Enterprise Decision Intelligence Layer](architecture/ENTERPRISE-DECISION-INTELLIGENCE-DESIGN.md) |
 | Inventory and costing | [Costing Engine Foundation](architecture/COSTING-ENGINE-FOUNDATION-DESIGN.md), [Valuation Review](architecture/READ-ONLY-INVENTORY-VALUATION-REVIEW-DESIGN.md), [Canonical Item Profile](architecture/CANONICAL-ITEM-MASTER-PROFILE-DESIGN.md) |
 | Operating controls | [Invoice-to-Payment Control](architecture/INVOICE-TO-PAYMENT-CONTROL-DESIGN.md), [Visual Automation Workbench](architecture/VISUAL-AUTOMATION-WORKBENCH-DESIGN.md), [Asia Operating Coverage](architecture/ASIA-OPERATING-COVERAGE-AND-ROLLOUT.md) |
 | Decisions | [Architecture Decision Records](adr/) |
@@ -35,6 +36,7 @@ The architecture records describe the service-aligned modular-monolith strategy,
 | Costing Engine | Immutable layers and deterministic, read-only evidence/preview controls are present. | Financial valuation, layer consumption, COGS, or accounting effects. |
 | Payroll and tax | Indonesia candidate-source evidence pack is retained. | Qualified review, calculated payroll, compliance validation, filing, or production use. |
 | COEB | Tenant-scoped, read-only retained-evidence projection for invoices and commitments in Cash Control. | A payable/receivable/commitment system of record, automatic correction, payment execution, journal/posting, treasury function, or external settlement. |
+| Enterprise Decision Intelligence | Tenant-scoped, request-time, read-only metric catalog with 219 visible definitions, observed evidence-backed values, lineage, and data-gap collection paths. | A data warehouse, third-party collector, telemetry pipeline, scheduled refresh, financial statement, valuation, recommendation engine, autonomous action, or external transmission. |
 
 ## Contribution and review path
 

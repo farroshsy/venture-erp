@@ -4,7 +4,7 @@ import { useVenture } from "@/contexts/VentureContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArrowRightLeft, BookOpenCheck, Boxes, BriefcaseBusiness, Calculator, ChevronDown, Factory, FileSearch, GitBranch, Globe2, Grid2X2, KeyRound, Landmark, LayoutDashboard, LogOut, MessageSquareText, Moon, Network, PanelLeftClose, PanelLeftOpen, Scale, ScrollText, ShieldCheck, ShoppingCart, Sun, Users, Workflow } from "lucide-react";
+import { Activity, ArrowRightLeft, BookOpenCheck, Boxes, BriefcaseBusiness, Calculator, ChevronDown, Factory, FileSearch, GitBranch, Globe2, Grid2X2, KeyRound, Landmark, LayoutDashboard, LogOut, MessageSquareText, Moon, Network, PanelLeftClose, PanelLeftOpen, Scale, ScrollText, ShieldCheck, ShoppingCart, Sun, Users, Workflow } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
@@ -29,6 +29,7 @@ const navigation = [
   { path: "/work", label: "Work control", icon: Workflow },
   { path: "/cash", label: "Cash control", icon: Landmark },
   { path: "/insights", label: "Operational insights", icon: LayoutDashboard },
+  { path: "/intelligence", label: "Enterprise intelligence", icon: Activity },
   { path: "/automation", label: "Automation workbench", icon: GitBranch },
   { path: "/asia", label: "Asia operations", icon: Globe2 },
   { path: "/cross-border", label: "Cross-border finance", icon: ArrowRightLeft },

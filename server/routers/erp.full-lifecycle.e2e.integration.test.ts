@@ -5,6 +5,7 @@ import { erpOperationalRecords, users, ventureMemberships } from "../../drizzle/
 import type { TrpcContext } from "../_core/context";
 import { getDb } from "../db";
 import { erpRouter } from "./erp";
+import { intelligenceRouter } from "./intelligence";
 
 const ventureId = 1;
 const operatorOpenId = "validation_e2e_operator_20260824";
@@ -17,6 +18,9 @@ let financeReviewerUserId = 0;
 
 function callerFor(userId: number, openId: string) {
   return erpRouter.createCaller({ user: { id: userId, openId, email: `${openId}@example.invalid`, name: openId, loginMethod: "validation", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: {} as TrpcContext["res"] });
+}
+function intelligenceCallerFor(userId: number, openId: string) {
+  return intelligenceRouter.createCaller({ user: { id: userId, openId, email: `${openId}@example.invalid`, name: openId, loginMethod: "validation", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: {} as TrpcContext["res"] });
 }
 
 beforeAll(async () => {
@@ -304,6 +308,23 @@ describe("typed-route sales lifecycle with real authorization", () => {
     expect(matchedPayable.outstandingEvidenceGaps).toContain("No retained invoice due date exists.");
     expect(mismatchedPayable).toMatchObject({ obligationType: "accounts_payable", matchingState: { status: "mismatch", reasonCodes: ["invoice_exceeds_purchase_order"] }, reconciliation: { status: "exception", exceptions: ["invoice_exceeds_purchase_order"] }, readiness: { amountReconciled: false, blocked: true } });
     expect(bridge.obligations.some(obligation => obligation.obligationType === "purchase_commitment" && obligation.sourceEvidenceReferences.linkedInvoices.some(invoice => invoice.id === matchedPayable.sourceEvidenceReferences.invoiceRecordId))).toBe(true);
+    expect(await admin.records.list({ ventureId })).toEqual(recordsBefore);
+    expect(await admin.journal.list({ ventureId })).toEqual(journalsBefore);
+  }, 20_000);
+
+  it("evaluates a governed metric catalog from retained tenant evidence without persisting metrics or changing operational state", async () => {
+    const admin = callerFor(1, "owner");
+    const recordsBefore = await admin.records.list({ ventureId });
+    const journalsBefore = await admin.journal.list({ ventureId });
+    const intelligence = await intelligenceCallerFor(1, "owner").overview({ ventureId });
+    expect(intelligence).toMatchObject({ model: { name: "Enterprise Decision Intelligence Layer", version: "0.1-governed-read-only" }, summary: { totalMetrics: expect.any(Number), observedMetricCount: expect.any(Number), evidenceGapMetricCount: expect.any(Number) }, boundary: { readOnlyMetricEvaluation: true, noMetricPersistence: true, noFinancialStatement: true, noValuationCalculation: true, noPaymentExecution: true, noJournalCreated: true, noPosting: true, noTaxCalculation: true, noPayrollCalculation: true, noFiling: true, noIntegrationTriggered: true, noExternalEffect: true } });
+    expect(intelligence.summary.totalMetrics).toBeGreaterThanOrEqual(100);
+    expect(intelligence.summary.observedMetricCount).toBeGreaterThan(0);
+    expect(intelligence.summary.evidenceGapMetricCount).toBeGreaterThan(0);
+    expect(intelligence.metrics.find(metric => metric.key === "operations.inventory_movements")).toMatchObject({ status: "observed", value: expect.any(Number), formula: expect.stringContaining("inventory-movement"), readiness: { safeToCompute: true, futureAutomationEligible: false, blocked: false } });
+    expect(intelligence.metrics.find(metric => metric.key === "finance.open_payable_invoices")).toMatchObject({ status: "observed", value: expect.any(Number), evidence: expect.arrayContaining([expect.objectContaining({ source: "erp_operational_records payable invoices" })]) });
+    expect(intelligence.metrics.find(metric => metric.key === "finance.cash_balance")).toMatchObject({ status: "partially_supported", value: null, readiness: { safeToCompute: false, futureAutomationEligible: false, blocked: true }, collectionRequirement: expect.stringContaining("ledger, cash") });
+    expect(intelligence.metrics.find(metric => metric.key === "ai.prompt_success_rate")).toMatchObject({ status: "not_modeled", value: null, missingEvidence: [expect.stringContaining("approved ai product source contract")], readiness: { formulaModeled: false, safeToCompute: false, blocked: true } });
     expect(await admin.records.list({ ventureId })).toEqual(recordsBefore);
     expect(await admin.journal.list({ ventureId })).toEqual(journalsBefore);
   }, 20_000);

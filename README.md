@@ -17,6 +17,7 @@ The managed Venture ERP workspace is available at **[ventureerp-ax3cnpay.manus.s
 | [Documentation hub](docs/README.md) | Navigate architecture records, ADRs, research, compliance gates, validation notes, and the supported operating model. |
 | [CREB design](docs/architecture/CANONICAL-RESOURCE-EVIDENCE-BRIDGE-DESIGN.md) | Review the active read-only Resource evidence projection, reconciliation semantics, gaps, and no-effect boundary. |
 | [COEB design](docs/architecture/CANONICAL-OBLIGATION-EVIDENCE-BRIDGE-DESIGN.md) | Review the active read-only obligation projection, retained-evidence rules, reconciliation semantics, gaps, and no-effect boundary. |
+| [Enterprise Decision Intelligence](docs/architecture/ENTERPRISE-DECISION-INTELLIGENCE-DESIGN.md) | Review the governed 219-metric catalog, retained-evidence evaluator, lineage, data-gap collection roadmap, and no-effect boundary. |
 
 ## What is implemented
 

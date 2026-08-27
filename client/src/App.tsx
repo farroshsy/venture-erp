@@ -32,6 +32,7 @@ const ModuleCatalog = lazy(() => import("./pages/ModuleCatalog"));
 const OperationsWorkspace = lazy(() => import("./pages/OperationsWorkspace"));
 const PortfolioDashboard = lazy(() => import("./pages/PortfolioDashboard"));
 const WorkspaceGuide = lazy(() => import("./pages/WorkspaceGuide"));
+const DecisionIntelligence = lazy(() => import("./pages/DecisionIntelligence"));
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -62,6 +63,7 @@ function Router() {
       <Route path={"/decisions"} component={DecisionGovernance} />
       <Route path={"/architecture"} component={Architecture} />
       <Route path={"/guide"} component={WorkspaceGuide} />
+      <Route path={"/intelligence"} component={DecisionIntelligence} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
