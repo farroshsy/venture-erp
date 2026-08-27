@@ -35,6 +35,7 @@ export const platformDocumentationIndex = [
   { id: "doc:service-maturity", title: "Service Maturity", summary: "L0–L3 readiness evidence for documentation, testing, observability, security, resilience, and support.", path: "docs/platform/SERVICE-MATURITY.md" },
   { id: "doc:enterprise-implementation", title: "Enterprise Platform Implementation Guide", summary: "Control-plane trade-offs, IAM and assistant operating cost, observability integration path, rollback posture, and multi-year roadmap.", path: "docs/architecture/ENTERPRISE-PLATFORM-IMPLEMENTATION.md" },
   { id: "doc:gate-1-production-hardening", title: "Gate 1 Production Hardening", summary: "Successive Gate 1–5 maturity roadmap, implemented request-time controls, local validation scope, recovery ownership, and exit evidence.", path: "docs/architecture/GATE-1-PRODUCTION-HARDENING-DESIGN.md" },
+  { id: "doc:gate-2-adoption-validation", title: "Gate 2 Adoption and Operator Validation", summary: "Consent-aware human-recorded adoption-study protocol, role journeys, recovery guidance, separate review, and evidence required before a Gate 2 conclusion.", path: "docs/architecture/GATE-2-ADOPTION-VALIDATION-DESIGN.md" },
   { id: "doc:control-plane-design", title: "Platform Control Plane Design", summary: "Source-of-truth rules, assistant retrieval policy, authorization boundaries, and dashboard truthfulness constraints.", path: "docs/architecture/PLATFORM-CONTROL-PLANE-DESIGN.md" },
 ];
 
@@ -98,6 +99,7 @@ export function getArchitectureGovernance() {
       { name: "Tenant boundary", status: "enforced", detail: "Membership checks protect every venture-scoped API path." },
       { name: "Operational readiness", status: "governed", detail: "L3 requires scorecard evidence, runbook, rollback, and deployment verification." },
       { name: "Gate 1 request-time hardening", status: "implemented", detail: "Correlation IDs, bounded completion logs, liveness/readiness, browser-facing headers, and per-process API rate-limit refusal are implemented; SLOs, alerts, and recovery drills remain unmeasured." },
+      { name: "Gate 2 adoption validation protocol", status: "implemented", detail: "Role-aware guidance, bounded journeys/recovery explanations, consent-confirmed pseudonymous observations, and separate study/observation review are implemented; real independent-sample exit evidence remains unmeasured." },
       { name: "Evidence-bounded AI", status: "enforced", detail: "Architecture assistant receives authorized platform evidence only and cannot act." },
     ],
     roadmap: [

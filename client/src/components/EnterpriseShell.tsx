@@ -35,6 +35,7 @@ const navigation = [
   { path: "/operating-system", label: "Operating system", icon: Flag },
   { path: "/validation", label: "Validation program", icon: ClipboardCheck },
   { path: "/reliability", label: "Operations reliability", icon: ShieldCheck },
+  { path: "/adoption", label: "Adoption validation", icon: Users },
   { path: "/automation", label: "Automation workbench", icon: GitBranch },
   { path: "/asia", label: "Asia operations", icon: Globe2 },
   { path: "/cross-border", label: "Cross-border finance", icon: ArrowRightLeft },
@@ -97,13 +98,13 @@ export function EnterpriseShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className={cn("min-h-screen transition-[margin] duration-200", isExpanded ? "lg:ml-[250px]" : "lg:ml-[76px]")}>
-        <header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-[#dfe3dc] bg-[#f5f6f3]/90 px-5 backdrop-blur-lg md:px-9">
-          <div className="flex items-center gap-3 lg:hidden"><Landmark className="h-5 w-5 text-[#164e45]" /><span className="text-sm font-extrabold tracking-[0.12em]">VENTURE ERP</span></div>
+        <header className="sticky top-0 z-20 flex h-[76px] min-w-0 items-center justify-between gap-2 border-b border-[#dfe3dc] bg-[#f5f6f3]/90 px-3 backdrop-blur-lg md:px-9">
+          <div className="flex min-w-0 items-center gap-2 lg:hidden"><Landmark className="h-5 w-5 shrink-0 text-[#164e45]" /><span className="text-sm font-extrabold tracking-[0.12em]">VENTURE ERP</span></div>
           <div className="hidden items-center gap-3 lg:flex"><GitBranch className="h-4 w-4 text-[#6c786f]" /><span className="text-xs font-semibold text-[#66726a]">Service-aligned foundation</span></div>
-          <div className="flex items-center gap-3">
-            <button onClick={toggleTheme} className="rounded-xl border border-[#d6dbd2] bg-white p-2 text-[#59675e] transition hover:bg-[#f1f5f2]" aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`} title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}>{theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}</button>
-            <div className="relative">
-              <select aria-label="Active venture" value={activeVentureId ?? ""} disabled={isLoading || ventures.length === 0} onChange={event => setActiveVentureId(Number(event.target.value))} className="appearance-none rounded-xl border border-[#d6dbd2] bg-white py-2 pl-3 pr-9 text-xs font-semibold text-[#293630] outline-none transition focus:border-[#1a6858] focus:ring-2 focus:ring-[#1a6858]/15">
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-2 lg:flex-none lg:gap-3">
+            <button onClick={toggleTheme} className="shrink-0 rounded-xl border border-[#d6dbd2] bg-white p-2 text-[#59675e] transition hover:bg-[#f1f5f2]" aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`} title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}>{theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}</button>
+            <div className="relative min-w-0 w-[190px] sm:w-[280px]">
+              <select aria-label="Active venture" value={activeVentureId ?? ""} disabled={isLoading || ventures.length === 0} onChange={event => setActiveVentureId(Number(event.target.value))} className="w-full min-w-0 appearance-none truncate rounded-xl border border-[#d6dbd2] bg-white py-2 pl-3 pr-9 text-xs font-semibold text-[#293630] outline-none transition focus:border-[#1a6858] focus:ring-2 focus:ring-[#1a6858]/15">
                 {ventures.length === 0 && <option value="">No venture selected</option>}
                 {ventures.map(venture => <option key={venture.id} value={venture.id}>{venture.name} · {venture.role.replace(/_/g, " ")}</option>)}
               </select>

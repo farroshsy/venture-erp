@@ -1,7 +1,7 @@
 import { useVenture } from "@/contexts/VentureContext";
 import { ContextualHelp } from "@/components/ContextualHelp";
 import { routeGuides } from "@/components/RouteGuide";
-import { ArrowRight, BookOpenCheck, Bot, Building2, CircleHelp, FileSearch, Landmark, ShieldCheck, Sparkles, Workflow } from "lucide-react";
+import { ArrowRight, BookOpenCheck, Bot, Building2, CircleHelp, FileSearch, Landmark, ShieldCheck, Sparkles, UsersRound, Workflow } from "lucide-react";
 import { Link } from "wouter";
 
 const journeys = [
@@ -11,6 +11,7 @@ const journeys = [
   { title: "Read evidence-backed reporting", icon: FileSearch, detail: "Finance Reporting aggregates only retained completed calculation evidence that passes its chain and invariant controls. It is activity reporting, not posted GL or formal statements.", link: "/finance-reporting", action: "Open Finance Reporting" },
   { title: "Use guided control assistance", icon: Sparkles, detail: "Modern guidance surfaces readiness, evidence gaps, and the next safe human action. It explains controls but never silently creates, posts, pays, files, or transmits anything.", link: "/journals", action: "Open guided Journal Control" },
   { title: "Investigate the evidence cockpit", icon: FileSearch, detail: "Enterprise Intelligence displays the governed 219-metric catalog, response-time evidence ledger, priority signals, dependency context, and concrete data-collection paths.", link: "/intelligence", action: "Open Enterprise Intelligence" },
+  { title: "Validate operator adoption", icon: UsersRound, detail: "Gate 2 provides role-aware orientation, bounded operator journeys, safe failure-recovery guidance, and a consent-confirmed human observation protocol with separate review.", link: "/adoption", action: "Open Adoption Validation" },
 ];
 const tutorials = [
   ["Portfolio", "/", "Compare venture posture and governed work.", "A leadership team identifies a venture needing an evidence review.", "Tenant-scoped visibility and a safe route to the relevant workspace.", "Open the selected control; no cross-tenant action is implied."],
@@ -31,6 +32,7 @@ const tutorials = [
   ["Enterprise Intelligence", "/intelligence", "Investigate all metric definitions and current retained-evidence availability.", "A leader reviews a recorded payable exception or data-coverage gap before deciding which evidence to inspect next.", "A transparent evidence ledger, metric lineage, dependency context, priority signals, and collection path.", "No forecast, automatic recommendation, decision, posting, payment, payroll, tax, filing, integration, or external action."],
   ["Knowledge graph", "/knowledge-graph", "Trace explicit retained relationships between metrics, evidence, canonical objects, workflow, records, audits, and decisions.", "A reviewer follows a metric’s retained evidence-source links to the related operational record or audit evidence.", "A tenant-scoped relationship view with missing links left absent rather than inferred.", "No graph write, causality claim, forecast, recommendation, decision, financial action, payroll, integration, or external effect."],
   ["Enterprise Operating System", "/operating-system", "Retain human-governed strategic objectives, decision memories, scenario preparations, evidence links, and external source-contract readiness.", "Leadership records an objective or decision context with real assumptions, evidence requirements, risks, and a separate approval path.", "A durable, tenant-scoped planning and learning register without automatic conclusions or action.", "No forecast, simulation, causal claim, recommendation, capital allocation, financial action, payroll, integration, or external effect."],
+  ["Adoption validation", "/adoption", "Run an evidence-first independent operator study with role-specific journeys and safe recovery guidance.", "A facilitator gives a participant a bounded task without teaching the flow, records only a consent-confirmed pseudonymous observation, then a different authorized human verifies or rejects it.", "A tenant-scoped protocol and reviewable study record, or an explicit empty/unmeasured posture until real observations exist.", "No clickstream/session tracking, profiling, external telemetry, automated adoption claim, payroll activation, financial effect, integration, or external action."],
 ];
 
 export default function WorkspaceGuide() {
