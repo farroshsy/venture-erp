@@ -17,6 +17,7 @@ export default function InventoryControl() {
   const balances = trpc.erp.inventory.balances.useQuery({ ventureId }, { enabled: !!activeVenture });
   const movements = trpc.erp.inventory.movements.useQuery({ ventureId }, { enabled: !!activeVenture });
   const itemProfiles = trpc.erp.master.itemProfiles.useQuery({ ventureId }, { enabled: !!activeVenture });
+  const resourceBridge = trpc.erp.canonicalResourceEvidence.bridge.useQuery({ ventureId }, { enabled: !!activeVenture });
   const [itemMasterId, setItemMasterId] = useState("");
   const [movementType, setMovementType] = useState<(typeof movementTypes)[number]>("receipt");
   const [quantity, setQuantity] = useState("0");
