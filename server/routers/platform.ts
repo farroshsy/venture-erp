@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { createVentureWithOwner, getPortfolioGovernanceForUser, getVentureGovernanceComparisonForUser, listVenturesForUser } from "../db";
 import { getArchitectureGovernance, getEnterpriseCatalog, getExecutiveArchitectureProjection } from "../platform/enterprise";
-import { requireVentureMembership } from "../platform/tenant";
+import { getProductionHardeningOverview } from "../platform/reliability";
+import { requireVentureMembership as requireVentureMembershipForUser } from "../platform/tenant";
 import { protectedProcedure, router } from "../_core/trpc";
 
 const createVentureInput = z.object({
@@ -16,9 +17,13 @@ type PlatformRouterDependencies = {
   getPortfolioGovernanceForUser: typeof getPortfolioGovernanceForUser;
   getVentureGovernanceComparisonForUser: typeof getVentureGovernanceComparisonForUser;
   createVentureWithOwner: typeof createVentureWithOwner;
+  requireVentureMembership?: typeof requireVentureMembershipForUser;
+  getProductionHardeningOverview?: typeof getProductionHardeningOverview;
 };
 
 export function createPlatformRouter(dependencies: PlatformRouterDependencies) {
+  const requireVentureMembership = dependencies.requireVentureMembership ?? requireVentureMembershipForUser;
+  const reliabilityOverview = dependencies.getProductionHardeningOverview ?? getProductionHardeningOverview;
   return router({
     myVentures: protectedProcedure.query(({ ctx }) => dependencies.listVenturesForUser(ctx.user.id)),
     portfolioOverview: protectedProcedure.query(({ ctx }) => dependencies.getPortfolioGovernanceForUser(ctx.user.id)),
@@ -39,6 +44,12 @@ export function createPlatformRouter(dependencies: PlatformRouterDependencies) {
       ventureMaturity: await dependencies.getVentureGovernanceComparisonForUser(ctx.user.id),
     })),
     architectureGovernance: protectedProcedure.query(() => getArchitectureGovernance()),
+    reliabilityOverview: protectedProcedure
+      .input(z.object({ ventureId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        await requireVentureMembership(ctx.user.id, input.ventureId);
+        return reliabilityOverview();
+      }),
     validateVentureContext: protectedProcedure
       .input(z.object({ ventureId: z.number().int().positive() }))
       .query(async ({ ctx, input }) => requireVentureMembership(ctx.user.id, input.ventureId)),

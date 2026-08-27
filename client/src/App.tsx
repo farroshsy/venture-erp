@@ -36,6 +36,7 @@ const DecisionIntelligence = lazy(() => import("./pages/DecisionIntelligence"));
 const KnowledgeGraph = lazy(() => import("./pages/KnowledgeGraph"));
 const OperatingSystem = lazy(() => import("./pages/OperatingSystem"));
 const ValidationProgram = lazy(() => import("./pages/ValidationProgram"));
+const OperationsReliability = lazy(() => import("./pages/OperationsReliability"));
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -70,6 +71,7 @@ function Router() {
       <Route path={"/knowledge-graph"} component={KnowledgeGraph} />
       <Route path={"/operating-system"} component={OperatingSystem} />
       <Route path={"/validation"} component={ValidationProgram} />
+      <Route path={"/reliability"} component={OperationsReliability} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

@@ -34,6 +34,7 @@ const navigation = [
   { path: "/knowledge-graph", label: "Knowledge graph", icon: Share2 },
   { path: "/operating-system", label: "Operating system", icon: Flag },
   { path: "/validation", label: "Validation program", icon: ClipboardCheck },
+  { path: "/reliability", label: "Operations reliability", icon: ShieldCheck },
   { path: "/automation", label: "Automation workbench", icon: GitBranch },
   { path: "/asia", label: "Asia operations", icon: Globe2 },
   { path: "/cross-border", label: "Cross-border finance", icon: ArrowRightLeft },

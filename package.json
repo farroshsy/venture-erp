@@ -13,6 +13,8 @@
     "test:integration": "vitest run server/**/*.integration.test.ts",
     "contracts:validate": "node scripts/validate-contracts.mjs",
     "verify:foundation": "node scripts/verify-foundation.mjs",
+    "test:gate1-capacity": "node scripts/gate1-capacity-harness.mjs",
+    "security:baseline": "node scripts/security-baseline.mjs",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {

@@ -34,6 +34,7 @@ export const platformDocumentationIndex = [
   { id: "doc:migration-roadmap", title: "Migration Roadmap", summary: "The staged move from a service-aligned foundation toward federated services with rollback controls.", path: "docs/architecture/MIGRATION-ROADMAP.md" },
   { id: "doc:service-maturity", title: "Service Maturity", summary: "L0–L3 readiness evidence for documentation, testing, observability, security, resilience, and support.", path: "docs/platform/SERVICE-MATURITY.md" },
   { id: "doc:enterprise-implementation", title: "Enterprise Platform Implementation Guide", summary: "Control-plane trade-offs, IAM and assistant operating cost, observability integration path, rollback posture, and multi-year roadmap.", path: "docs/architecture/ENTERPRISE-PLATFORM-IMPLEMENTATION.md" },
+  { id: "doc:gate-1-production-hardening", title: "Gate 1 Production Hardening", summary: "Successive Gate 1–5 maturity roadmap, implemented request-time controls, local validation scope, recovery ownership, and exit evidence.", path: "docs/architecture/GATE-1-PRODUCTION-HARDENING-DESIGN.md" },
   { id: "doc:control-plane-design", title: "Platform Control Plane Design", summary: "Source-of-truth rules, assistant retrieval policy, authorization boundaries, and dashboard truthfulness constraints.", path: "docs/architecture/PLATFORM-CONTROL-PLANE-DESIGN.md" },
 ];
 
@@ -96,12 +97,15 @@ export function getArchitectureGovernance() {
       { name: "Contract-first delivery", status: "enforced", detail: "Public contract validator and compatible-release policy are in the quality gate." },
       { name: "Tenant boundary", status: "enforced", detail: "Membership checks protect every venture-scoped API path." },
       { name: "Operational readiness", status: "governed", detail: "L3 requires scorecard evidence, runbook, rollback, and deployment verification." },
+      { name: "Gate 1 request-time hardening", status: "implemented", detail: "Correlation IDs, bounded completion logs, liveness/readiness, browser-facing headers, and per-process API rate-limit refusal are implemented; SLOs, alerts, and recovery drills remain unmeasured." },
       { name: "Evidence-bounded AI", status: "enforced", detail: "Architecture assistant receives authorized platform evidence only and cannot act." },
     ],
     roadmap: [
-      { stage: "Current", title: "Governed control plane", detail: "Catalog, ADRs, scope, decision evidence, and access administration live in one managed foundation." },
-      { stage: "Next", title: "Observability ingestion", detail: "Connect CI/CD, traces, SLOs, incidents, queues, and external integration health before displaying operational KPIs." },
-      { stage: "Later", title: "Federated platform services", detail: "Extract contexts when L3 maturity and a documented scale, security, or release driver exist." },
+      { stage: "Gate 1", title: "Production hardening", detail: "Build evidence for reliability, security, recovery, performance, integrity, and operating ownership before extending data or AI surfaces." },
+      { stage: "Gate 2", title: "Adoption", detail: "Use human-reviewed evidence to establish that independent users can safely complete real authorized workflows." },
+      { stage: "Gate 3", title: "Integrations and data acquisition", detail: "Connect governed systems of record only after hardening/adoption evidence supports monitored provenance, failure visibility, and replay." },
+      { stage: "Gate 4", title: "AI and decision intelligence", detail: "Enable evidence-grounded retrieval only after source, authorization, provenance, privacy, and human-review controls are proven." },
+      { stage: "Gate 5", title: "Commercialization", detail: "Make customer-facing commitments only after operating and adoption evidence justifies them." },
     ],
     rfcSeam: { status: "planned", description: "RFC records are intentionally modeled as a governance extension point. ADRs remain the durable decision record until review workflow and document integration are introduced." },
   };

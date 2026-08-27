@@ -18,6 +18,7 @@ The managed Venture ERP workspace is available at **[ventureerp-ax3cnpay.manus.s
 | [Knowledge Graph](https://ventureerp-ax3cnpay.manus.space/knowledge-graph) | Follow explicit tenant-scoped relationships between metrics, retained evidence, canonical objects, workflow, operations, audits, and human-governed planning records. |
 | [Enterprise Operating System](https://ventureerp-ax3cnpay.manus.space/operating-system) | Draft and separately review objectives, key results, decision memories, scenario preparations, evidence links, and external source-contract readiness. |
 | [Operating System Validation Program](https://ventureerp-ax3cnpay.manus.space/validation) | Review structural benchmark posture, metric trust, decision replay, explicit evidence paths, and human-recorded validation observations; retain/review validation evidence with separate human approval. |
+| [Operations Reliability](https://ventureerp-ax3cnpay.manus.space/reliability) | Inspect Gate 1 request-time readiness, hardening controls, local capacity-test scope, operational gaps, and the evidence required before later maturity gates. |
 | [Documentation hub](docs/README.md) | Navigate architecture records, ADRs, research, compliance gates, validation notes, and the supported operating model. |
 | [CREB design](docs/architecture/CANONICAL-RESOURCE-EVIDENCE-BRIDGE-DESIGN.md) | Review the active read-only Resource evidence projection, reconciliation semantics, gaps, and no-effect boundary. |
 | [COEB design](docs/architecture/CANONICAL-OBLIGATION-EVIDENCE-BRIDGE-DESIGN.md) | Review the active read-only obligation projection, retained-evidence rules, reconciliation semantics, gaps, and no-effect boundary. |
@@ -25,6 +26,8 @@ The managed Venture ERP workspace is available at **[ventureerp-ax3cnpay.manus.s
 | [Executive Evidence Cockpit](docs/architecture/EXECUTIVE-EVIDENCE-COCKPIT-DESIGN.md) | Review the response-only metric ledger, declared dependency/evidence context, deterministic priority signals, all-route guidance, and non-autonomous boundary. |
 | [Enterprise Operating System Intelligence](docs/architecture/ENTERPRISE-OPERATING-SYSTEM-INTELLIGENCE-DESIGN.md) | Review the integrated Knowledge Graph, metric governance, human planning records, source-contract/AI readiness, rollout gates, and strict no-effect boundaries. |
 | [Operating System Validation Program](docs/architecture/OPERATING-SYSTEM-VALIDATION-PROGRAM-DESIGN.md) | Review the structural benchmark, metric-trust disclosure, human validation observation, decision replay, evidence-path, privacy/collection, and non-autonomous validation controls. |
+| [Gate 1 Production Hardening](docs/architecture/GATE-1-PRODUCTION-HARDENING-DESIGN.md) | Review the Gate 1–5 maturity program, implemented request-time hardening controls, recovery/operational gaps, local-only capacity harness, and exit requirements. |
+| [Gate 1 Operations Runbook](docs/platform/GATE-1-OPERATIONS-RUNBOOK.md) | Follow safe correlation-ID triage, probe interpretation, local capacity-harness limits, recovery ownership boundaries, and escalation-evidence requirements. |
 
 ## What is implemented
 
@@ -39,6 +42,7 @@ The delivered workspace includes a venture-scoped portfolio dashboard, an execut
 | **Enterprise Intelligence cockpit** | Provides a governed 219-metric catalog, response-only metric evidence ledger, declared dependency/evidence-context view, deterministic priority signals, data-coverage gaps, and route links for human investigation. | It is not a financial ledger, data warehouse, forecast, causal model, autonomous recommendation engine, decision authority, or external data collector. Observed values are limited to retained tenant evidence. |
 | **Enterprise Operating System intelligence** | Provides a tenant-scoped Knowledge Graph plus human-governed objectives, key results, decision memories, scenario preparations, explicit evidence links, and external-source contract readiness. | It does not infer links or causality, calculate forecasts/scenarios, invoke AI, collect external data, recommend/execute a decision, allocate capital, post, pay, file, or create financial, payroll, or external effects. |
 | **Operating System Validation Program** | Provides tenant-scoped structural benchmark posture, metric-trust disclosure, human-recorded validation observations with separate verification, decision replay, explicit evidence paths, and data-collection readiness. | It does not auto-track behavior, auto-grade success, certify quality/compliance, infer causality, calculate ROI/forecasts/scenarios, recommend/execute a decision, post/pay/file, calculate tax/payroll, collect externally, or cause external effects. |
+| **Gate 1 Operations Reliability** | Provides tenant-gated request-time liveness/readiness posture, correlation IDs, bounded completion logs, browser-facing security headers, per-process rate-limit refusal, local-only capacity-harness guidance, and explicit maturity gaps. | It is not a telemetry/alerting/trace backend, distributed rate limiter, uptime/SLO/error-budget result, recovery drill, backup service, production load test, financial/payroll control, or external integration. |
 | **Costing Engine evidence controls** | Retains finance-owned effective-dated policy revisions, immutable layers, deterministic allocation evidence, and read-only valuation previews. | Evidence is not a financial effect: no layer consumption, inventory revaluation, COGS, journal/GL, tax, payroll, payment, filing, or external action is activated. |
 | **Decision governance** | Scores SAP, alternative ERP, and custom delivery using declared criteria and weights. | The score is transparent decision support, not an automatic procurement recommendation. |
 | **AI evidence review** | Produces a structured summary, assumptions, gaps, and risks from user-supplied evidence. | The server forces `humanApprovalRequired = true`; only authorized people can approve a review. |
@@ -140,6 +144,8 @@ For strategic context, open **Knowledge Graph** to filter and inspect only expli
 
 For a validation review, open **Operating System Validation Program**. Inspect the dimension’s source, unit, and stated limitation before interpreting it. Use metric structural trust only to learn whether a formula, retained evidence, tenant scope, and gap disclosure are present—never as a business-success or data-accuracy score. Record a deliberately human-measured question, review, or outcome only when the source reference and limitation are known; a different authorized human must verify/reject the observation. Retain a release benchmark only to preserve the exact structural evidence posture for later review, then obtain separate approval. See [Operating System Validation Program Design](docs/architecture/OPERATING-SYSTEM-VALIDATION-PROGRAM-DESIGN.md) for the full collection, privacy, and interpretation gates.
 
+For Gate 1 review, open **Operations Reliability**. A green `readyz` result establishes only that the application process completed its bounded database-readiness check at that instant. It does not establish availability, performance, backup health, recovery time, SLO attainment, security certification, or production capacity. Capture the returned `x-request-id` when investigating an observed failure; use `pnpm test:gate1-capacity` only for its default bounded localhost health-probe exercise. See [Gate 1 Production Hardening Design](docs/architecture/GATE-1-PRODUCTION-HARDENING-DESIGN.md) for the exact implementation, recovery ownership, operational gaps, and exit evidence.
+
 The interface marks deliberate boundaries rather than concealing them. A visible control or form does not imply live banking, logistics, invoicing, tax, payroll, valuation, posting, formal statements, or external integrations. Follow the workspace notices, create records only from real authorized operating evidence, and use the audit register to trace changes. The `docs/` directory contains the durable design, research, ADR, and validation records for review in GitHub.
 
 ## Local development and quality gates
@@ -153,10 +159,12 @@ pnpm test
 pnpm test:integration
 pnpm contracts:validate
 pnpm verify:foundation
+pnpm test:gate1-capacity
+pnpm security:baseline
 pnpm build
 ```
 
-The current implementation validated `pnpm check`, `pnpm build`, all Vitest suites, integration suites, the public-contract validator, and the foundation verifier. The latest completed CREB quality gate recorded **94 tests** under `pnpm test` and **25 tests** under `pnpm test:integration`; see [Validation Notes](docs/platform/VALIDATION-NOTES.md) for the exact command outcomes and scope. Before a production release, run the deployed health probe and a contract smoke suite against the target environment as described in `docs/platform/ENGINEERING-STANDARDS.md`.
+The current implementation validated `pnpm check`, `pnpm build`, all Vitest suites, integration suites, the public-contract validator, and the foundation verifier. The latest completed Operating System Validation Program gate recorded **109 tests** under `pnpm test` and **29 tests** under `pnpm test:integration`; Gate 1 results are recorded separately in [Validation Notes](docs/platform/VALIDATION-NOTES.md) when their full verification completes. Before a production release, run the deployed health probe and a contract smoke suite against the target environment as described in `docs/platform/ENGINEERING-STANDARDS.md`.
 
 ## Service maturity and extraction gates
 

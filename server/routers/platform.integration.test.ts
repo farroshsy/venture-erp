@@ -38,4 +38,25 @@ describe("platform portfolioOverview tenant scoping", () => {
     expect(listCasesForVenture).toHaveBeenCalledWith(41);
     expect(listCasesForVenture).not.toHaveBeenCalledWith(42);
   });
+
+  it("requires active membership before returning the Gate 1 reliability posture and exposes no tenant business record mutation path", async () => {
+    const requireVentureMembership = vi.fn().mockResolvedValue({ ventureId: 41, userId: 6, role: "portfolio_admin", status: "active" });
+    const getProductionHardeningOverview = vi.fn().mockResolvedValue({
+      posture: { program: "Gate 1 — Production Hardening", status: "in_progress" },
+      readiness: { ready: true },
+      runtime: { boundaries: { noBusinessStateMutation: true, noFinancialOrPayrollEffect: true } },
+    });
+    const router = createPlatformRouter({
+      listVenturesForUser: vi.fn(),
+      getPortfolioGovernanceForUser: vi.fn(),
+      createVentureWithOwner: vi.fn(),
+      requireVentureMembership,
+      getProductionHardeningOverview,
+    });
+
+    const overview = await callerFor(router, 6).reliabilityOverview({ ventureId: 41 });
+    expect(requireVentureMembership).toHaveBeenCalledWith(6, 41);
+    expect(getProductionHardeningOverview).toHaveBeenCalledOnce();
+    expect(overview.runtime.boundaries).toMatchObject({ noBusinessStateMutation: true, noFinancialOrPayrollEffect: true });
+  });
 });
