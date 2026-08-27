@@ -3,6 +3,7 @@ import { startLogin } from "@/const";
 import { useVenture } from "@/contexts/VentureContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
+import { RouteGuide } from "@/components/RouteGuide";
 import { cn } from "@/lib/utils";
 import { Activity, ArrowRightLeft, BookOpenCheck, Boxes, BriefcaseBusiness, Calculator, ChevronDown, Factory, FileSearch, GitBranch, Globe2, Grid2X2, KeyRound, Landmark, LayoutDashboard, LogOut, MessageSquareText, Moon, Network, PanelLeftClose, PanelLeftOpen, Scale, ScrollText, ShieldCheck, ShoppingCart, Sun, Users, Workflow } from "lucide-react";
 import { useState } from "react";
@@ -107,7 +108,7 @@ export function EnterpriseShell({ children }: { children: React.ReactNode }) {
             <button onClick={logout} className="hidden items-center gap-2 rounded-xl px-2.5 py-2 text-xs font-semibold text-[#59675e] transition hover:bg-white hover:text-[#26342d] sm:flex"><LogOut className="h-3.5 w-3.5" />{user.name?.split(" ")[0] ?? "Account"}</button>
           </div>
         </header>
-        <div className="mx-auto max-w-[1540px] px-5 py-7 md:px-9 md:py-9">{children}</div>
+        <div className="mx-auto max-w-[1540px] px-5 py-7 md:px-9 md:py-9">{children}<RouteGuide pathname={location} /></div>
       </main>
     </div>
   );

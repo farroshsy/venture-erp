@@ -138,14 +138,60 @@ export async function getDecisionIntelligenceOverview(ventureId: number) {
     open_crm_opportunities: { value: opportunities.filter(opportunity => !["won", "lost", "cancelled"].includes(opportunity.stage)).length, evidence: [{ source: "erp_crm_opportunities", recordCount: opportunities.length }], formula: "Count retained CRM opportunities whose stage is not won, lost, or cancelled; this is not qualified pipeline value." },
     active_item_profiles: { value: itemProfiles.filter(profile => profile.status === "active").length, evidence: [{ source: "erp_item_master_profiles", recordCount: itemProfiles.length }], formula: "Count active retained canonical item-master profiles, the identity gate for initial Resource projections." },
   };
+  const evaluatedAt = new Date().toISOString();
   const metrics = metricCatalog.map(definition => {
     const observation = definition.observedKey ? observed[definition.observedKey] : undefined;
     const status = observation ? "observed" as const : definition.preferredStatus;
     const confidence = status === "observed" ? "high" : status === "partially_supported" ? "limited" : "unavailable";
     const missingEvidence = status === "observed" ? [] : definition.requiredEvidence;
-    return { ...definition, status, confidence, value: observation?.value ?? null, valueDisplay: observation ? observation.value.toLocaleString() : "Unavailable — evidence not modeled", formula: observation?.formula ?? definition.formula, evidence: observation?.evidence ?? [], missingEvidence, lineage: [{ stage: "metric_definition", detail: `${definition.key} · owner: ${definition.owner}` }, { stage: "formula", detail: observation?.formula ?? definition.formula }, { stage: "evidence", detail: observation ? observation.evidence.map(item => `${item.source} (${item.recordCount})`).join("; ") : missingEvidence.join("; ") }, { stage: "source_contract", detail: observation ? "Tenant-scoped retained evidence queried at request time." : definition.collectionRequirement }], collectionRequirement: definition.collectionRequirement, detail: observation?.detail ?? null, lastEvaluatedAt: new Date().toISOString(), readiness: { formulaModeled: status !== "not_modeled", requiredEvidenceAvailable: status === "observed", safeToCompute: status === "observed", futureAutomationEligible: false, blocked: status !== "observed" } };
+    return { ...definition, status, confidence, value: observation?.value ?? null, valueDisplay: observation ? observation.value.toLocaleString() : "Unavailable — evidence not modeled", formula: observation?.formula ?? definition.formula, evidence: observation?.evidence ?? [], missingEvidence, lineage: [{ stage: "metric_definition", detail: `${definition.key} · owner: ${definition.owner}` }, { stage: "formula", detail: observation?.formula ?? definition.formula }, { stage: "evidence", detail: observation ? observation.evidence.map(item => `${item.source} (${item.recordCount})`).join("; ") : missingEvidence.join("; ") }, { stage: "source_contract", detail: observation ? "Tenant-scoped retained evidence queried at request time." : definition.collectionRequirement }], collectionRequirement: definition.collectionRequirement, detail: observation?.detail ?? null, lastEvaluatedAt: evaluatedAt, readiness: { formulaModeled: status !== "not_modeled", requiredEvidenceAvailable: status === "observed", safeToCompute: status === "observed", futureAutomationEligible: false, blocked: status !== "observed" } };
   });
   const statusCounts = metrics.reduce<Record<MetricStatus, number>>((counts, metric) => { counts[metric.status] += 1; return counts; }, { observed: 0, partially_supported: 0, blocked: 0, not_modeled: 0 });
   const categorySummaries = (Object.keys(categoryMetadata) as MetricCategory[]).map(category => ({ category, label: categoryMetadata[category].label, question: categoryMetadata[category].question, owner: categoryMetadata[category].owner, totalMetrics: metrics.filter(metric => metric.category === category).length, observedMetrics: metrics.filter(metric => metric.category === category && metric.status === "observed").length, blockedOrUnmodeledMetrics: metrics.filter(metric => metric.category === category && metric.status !== "observed").length, collectionRequirement: categoryMetadata[category].collectionRequirement }));
-  return { model: { name: "Enterprise Decision Intelligence Layer", version: "0.1-governed-read-only", posture: "tenant_scoped_metric_catalog_with_observed_and_explicitly_unavailable_evidence", evaluatedAt: new Date().toISOString() }, executiveScorecard: metrics.filter(metric => metric.status === "observed").slice(0, 10), metrics, categorySummaries, summary: { totalMetrics: metrics.length, statusCounts, observedMetricCount: statusCounts.observed, evidenceGapMetricCount: metrics.length - statusCounts.observed, sourceSummary: { operationalRecordCount: records.length, inventoryMovementCount: movements.length, auditEventCount: auditEvents.length, activeSupplierProfileCount: supplierProfiles.filter(profile => profile.status === "active").length } }, boundary: { readOnlyMetricEvaluation: true as const, noMetricPersistence: true as const, noFinancialStatement: true as const, noValuationCalculation: true as const, noPaymentExecution: true as const, noJournalCreated: true as const, noPosting: true as const, noTaxCalculation: true as const, noPayrollCalculation: true as const, noFiling: true as const, noIntegrationTriggered: true as const, noExternalEffect: true as const } };
+  const metricByKey = new Map(metrics.map(metric => [metric.key, metric]));
+  const declaredDependencyNodes = ["company_value.arr", "company_value.mrr", "sales.active_subscriptions", "product.onboarding_completion", "product.feature_adoption", "engineering.api_latency", "finance.open_receivable_invoices", "finance.open_payable_invoices", "finance.payable_match_exceptions", "operations.inventory_movements", "operations.pending_workflow_tasks", "operations.operational_audit_events"];
+  const dependencyNodes = declaredDependencyNodes.flatMap(key => {
+    const metric = metricByKey.get(key);
+    return metric ? [{ id: key, label: metric.name, status: metric.status, kind: "metric" as const }] : [];
+  });
+  const declaredDependencyEdges = [
+      { from: "company_value.arr", to: "company_value.mrr", relationship: "requires_modeled_input" },
+      { from: "company_value.mrr", to: "sales.active_subscriptions", relationship: "requires_modeled_input" },
+      { from: "sales.active_subscriptions", to: "product.onboarding_completion", relationship: "requires_modeled_input" },
+      { from: "product.onboarding_completion", to: "product.feature_adoption", relationship: "requires_modeled_input" },
+      { from: "product.feature_adoption", to: "engineering.api_latency", relationship: "requires_modeled_input" },
+      { from: "finance.open_receivable_invoices", to: "finance.open_payable_invoices", relationship: "shared_obligation_evidence_context" },
+      { from: "finance.open_payable_invoices", to: "finance.payable_match_exceptions", relationship: "shared_payable_evidence_context" },
+      { from: "finance.payable_match_exceptions", to: "operations.inventory_movements", relationship: "retained_receipt_evidence_context" },
+      { from: "operations.pending_workflow_tasks", to: "operations.operational_audit_events", relationship: "retained_operational_evidence_context" },
+  ];
+  const dependencyNodeIds = new Set(dependencyNodes.map(node => node.id));
+  const dependencyGraph = {
+    nodes: dependencyNodes,
+    edges: declaredDependencyEdges.filter(edge => dependencyNodeIds.has(edge.from) && dependencyNodeIds.has(edge.to)),
+    posture: "dependency_and_evidence_context_not_causality_or_prediction" as const,
+  };
+  const metricLedger = metrics.map(metric => ({
+    ledgerEntryId: `MetricLedger:${metric.key}:${evaluatedAt}`,
+    metricKey: metric.key,
+    metricName: metric.name,
+    definitionVersion: metric.definitionVersion,
+    effectiveFrom: metric.effectiveFrom,
+    evaluatedAt,
+    status: metric.status,
+    confidence: metric.confidence,
+    value: metric.value,
+    valueDisplay: metric.valueDisplay,
+    sourceEvidence: metric.evidence,
+    missingEvidence: metric.missingEvidence,
+    evidencePosture: metric.status === "observed" ? "retained_source_evidence_observed" : "required_evidence_missing_or_unmodeled",
+    persistence: "response_only_not_persisted" as const,
+  }));
+  const prioritySignals = [
+    ...(mismatchedPayables.length ? [{ id: "payable-match-exceptions", level: "attention" as const, title: "Recorded payable match exceptions require human review", reason: `${mismatchedPayables.length} retained payable invoice(s) have a three-way-match mismatch snapshot.`, evidenceMetricKeys: ["finance.payable_match_exceptions"], owner: "Finance leadership", confidence: "high", investigationRoute: "/cash", expectedImpact: "No impact or outcome is estimated; this signal only surfaces retained exception evidence." }] : []),
+    ...(openPayables.length ? [{ id: "open-payable-evidence", level: "review" as const, title: "Open payable evidence is visible for review", reason: `${openPayables.length} payable invoice(s) retain an open internal-evidence balance.`, evidenceMetricKeys: ["finance.open_payable_invoices", "finance.posted_internal_payment_evidence"], owner: "Finance leadership", confidence: "high", investigationRoute: "/cash", expectedImpact: "No disbursement, cash forecast, or payment recommendation is made." }] : []),
+    ...(workflowTasks.filter(task => task.status === "pending").length ? [{ id: "pending-human-tasks", level: "review" as const, title: "Pending human workflow tasks are retained", reason: `${workflowTasks.filter(task => task.status === "pending").length} tenant-scoped workflow task(s) remain pending.`, evidenceMetricKeys: ["operations.pending_workflow_tasks"], owner: "Operations leadership", confidence: "high", investigationRoute: "/automation", expectedImpact: "No task is approved, rejected, or completed by this signal." }] : []),
+    ...categorySummaries.filter(category => category.observedMetrics === 0).slice(0, 3).map(category => ({ id: `coverage-${category.category}`, level: "coverage_gap" as const, title: `${category.label} lacks observed metric evidence`, reason: `No metrics in the ${category.label} category have a current retained-evidence computation.`, evidenceMetricKeys: [] as string[], owner: category.owner, confidence: "high", investigationRoute: "/intelligence", expectedImpact: category.collectionRequirement })),
+  ].slice(0, 8);
+  return { model: { name: "Enterprise Decision Intelligence Layer", version: "0.2-executive-read-only", posture: "tenant_scoped_metric_catalog_with_observed_and_explicitly_unavailable_evidence", evaluatedAt }, executiveScorecard: metrics.filter(metric => metric.status === "observed").slice(0, 10), metrics, metricLedger, dependencyGraph, prioritySignals, categorySummaries, summary: { totalMetrics: metrics.length, statusCounts, observedMetricCount: statusCounts.observed, evidenceGapMetricCount: metrics.length - statusCounts.observed, sourceSummary: { operationalRecordCount: records.length, inventoryMovementCount: movements.length, auditEventCount: auditEvents.length, activeSupplierProfileCount: supplierProfiles.filter(profile => profile.status === "active").length } }, boundary: { readOnlyMetricEvaluation: true as const, responseOnlyMetricLedger: true as const, noMetricPersistence: true as const, noFinancialStatement: true as const, noValuationCalculation: true as const, noPaymentExecution: true as const, noJournalCreated: true as const, noPosting: true as const, noTaxCalculation: true as const, noPayrollCalculation: true as const, noFiling: true as const, noIntegrationTriggered: true as const, noAutonomousRecommendation: true as const, noExternalEffect: true as const } };
 }

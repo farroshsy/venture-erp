@@ -14,10 +14,12 @@ The managed Venture ERP workspace is available at **[ventureerp-ax3cnpay.manus.s
 | --- | --- |
 | [Live workspace](https://ventureerp-ax3cnpay.manus.space) | Use the tenant-scoped control workspace with a valid authorized session. |
 | [Workspace Guide](https://ventureerp-ax3cnpay.manus.space/guide) | Read practical intent, navigation, expected outcomes, and boundaries for the active modules. |
+| [Enterprise Intelligence cockpit](https://ventureerp-ax3cnpay.manus.space/intelligence) | Search every governed metric, inspect its evidence ledger/lineage, review deterministic priority signals, and identify the next data-collection capability. |
 | [Documentation hub](docs/README.md) | Navigate architecture records, ADRs, research, compliance gates, validation notes, and the supported operating model. |
 | [CREB design](docs/architecture/CANONICAL-RESOURCE-EVIDENCE-BRIDGE-DESIGN.md) | Review the active read-only Resource evidence projection, reconciliation semantics, gaps, and no-effect boundary. |
 | [COEB design](docs/architecture/CANONICAL-OBLIGATION-EVIDENCE-BRIDGE-DESIGN.md) | Review the active read-only obligation projection, retained-evidence rules, reconciliation semantics, gaps, and no-effect boundary. |
 | [Enterprise Decision Intelligence](docs/architecture/ENTERPRISE-DECISION-INTELLIGENCE-DESIGN.md) | Review the governed 219-metric catalog, retained-evidence evaluator, lineage, data-gap collection roadmap, and no-effect boundary. |
+| [Executive Evidence Cockpit](docs/architecture/EXECUTIVE-EVIDENCE-COCKPIT-DESIGN.md) | Review the response-only metric ledger, declared dependency/evidence context, deterministic priority signals, all-route guidance, and non-autonomous boundary. |
 
 ## What is implemented
 
@@ -29,6 +31,7 @@ The delivered workspace includes a venture-scoped portfolio dashboard, an execut
 | **Service catalog** | Shows owner, contract, data authority, release, health, deployment posture, and maturity per context. | Catalog metadata is a control-plane read model, not an operational system of record. |
 | **Operational ERP workspaces** | Provides controlled finance, procurement, inventory, sales, people, delivery/assets, service/CRM, work, cash, automation, Asia, and operational-insight workspaces. | Domain commands remain scoped to the bounded context; live payment execution, statutory filing, external transmission, and unreviewed payroll activation are unavailable. |
 | **Canonical evidence projections** | Provides CFOM discovery, a semantic evidence-gap/readiness register, canonical item/supplier profiles, and the inventory-only Canonical Resource Evidence Bridge (CREB). | These are tenant-scoped read models. CREB does not create a second inventory ledger, adjust balances, convert units, value inventory, calculate COGS, or post accounting. |
+| **Enterprise Intelligence cockpit** | Provides a governed 219-metric catalog, response-only metric evidence ledger, declared dependency/evidence-context view, deterministic priority signals, data-coverage gaps, and route links for human investigation. | It is not a financial ledger, data warehouse, forecast, causal model, autonomous recommendation engine, decision authority, or external data collector. Observed values are limited to retained tenant evidence. |
 | **Costing Engine evidence controls** | Retains finance-owned effective-dated policy revisions, immutable layers, deterministic allocation evidence, and read-only valuation previews. | Evidence is not a financial effect: no layer consumption, inventory revaluation, COGS, journal/GL, tax, payroll, payment, filing, or external action is activated. |
 | **Decision governance** | Scores SAP, alternative ERP, and custom delivery using declared criteria and weights. | The score is transparent decision support, not an automatic procurement recommendation. |
 | **AI evidence review** | Produces a structured summary, assumptions, gaps, and risks from user-supplied evidence. | The server forces `humanApprovalRequired = true`; only authorized people can approve a review. |
@@ -89,6 +92,7 @@ server/
   platform/               # Tenant boundary, maturity, catalog, executive and governance projections
   governance/             # Decision scoring and AI approval policy
   assistant/              # Read-only evidence retrieval and model synthesis
+  intelligence/           # Governed metric catalog, response-only ledger, dependency context, priority signals
   iam/                    # Roles, permissions, scoped assignment and effective-permission policy
   erp/                    # Tenant-scoped operational, finance-evidence, costing, and canonical-projection services
   routers/                # Typed API contracts for platform, governance, assistant, and IAM contexts
@@ -120,7 +124,9 @@ The separately authorized **Canonical Obligation Evidence Bridge (COEB)** is now
 
 ## Using the workspace safely
 
-Open **Workspace guide** in the left navigation for an in-product walkthrough. Start by selecting a venture in the header: that scope determines the records, controls, and authorization visible to you. Use the portfolio and architecture workspaces to understand governance and maturity; use operational modules to create and progress tenant-scoped internal records; use Journal Control to configure/review finance-owned rules, evidence, and simulations; use **Costing Engine** only to retain finance-reviewed policy/layer/evidence previews; and use Finance Reporting only as an evidence-backed activity view.
+Open **Workspace guide** in the left navigation for an in-product walkthrough. It now includes an **Every active route** index: each route explains its purpose, the visible safe human action, retained evidence to review, and active boundary. The same contextual help panel appears at the bottom of every active page. Start by selecting a venture in the header: that scope determines the records, controls, and authorization visible to you. Use the portfolio and architecture workspaces to understand governance and maturity; use operational modules to create and progress tenant-scoped internal records; use Journal Control to configure/review finance-owned rules, evidence, and simulations; use **Costing Engine** only to retain finance-reviewed policy/layer/evidence previews; and use Finance Reporting only as an evidence-backed activity view.
+
+For a portfolio-level analytical review, open **Enterprise Intelligence**. Begin with a deterministic priority signal or an observed scorecard card; inspect the metric’s source-code definition version, effective date, formula, response-only evidence-ledger row, source/gap lineage, readiness, and collection path; then navigate to the named source workspace for a human investigation. The dependency display communicates declared input/evidence context only. It does not infer causality, forecast performance, select a recommendation, or execute any decision.
 
 The interface marks deliberate boundaries rather than concealing them. A visible control or form does not imply live banking, logistics, invoicing, tax, payroll, valuation, posting, formal statements, or external integrations. Follow the workspace notices, create records only from real authorized operating evidence, and use the audit register to trace changes. The `docs/` directory contains the durable design, research, ADR, and validation records for review in GitHub.
 
