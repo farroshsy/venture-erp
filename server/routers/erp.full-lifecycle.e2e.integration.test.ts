@@ -290,6 +290,24 @@ describe("typed-route sales lifecycle with real authorization", () => {
     expect(await admin.inventory.movements({ ventureId, itemMasterId: item.id })).toEqual(movementsBefore); expect(await admin.inventory.balances({ ventureId })).toEqual(balancesBefore); expect(await admin.journal.list({ ventureId })).toEqual(journalsBefore);
   }, 30_000);
 
+  it("projects retained obligation evidence without changing invoices, payments, commitments, or journals", async () => {
+    const admin = callerFor(1, "owner");
+    const recordsBefore = await admin.records.list({ ventureId });
+    const journalsBefore = await admin.journal.list({ ventureId });
+    const matchedInvoice = recordsBefore.find(record => record.recordNumber === "VALIDATION-E2E-THREE-WAY-AP-20260825")!;
+    const mismatchedInvoice = recordsBefore.find(record => record.recordNumber === "VALIDATION-E2E-THREE-WAY-AP-MISMATCH-20260825")!;
+    const bridge = await admin.canonicalObligationEvidence.bridge({ ventureId });
+    const matchedPayable = bridge.obligations.find(obligation => obligation.canonicalObligationId === `Obligation:Invoice:${matchedInvoice.id}`)!;
+    const mismatchedPayable = bridge.obligations.find(obligation => obligation.canonicalObligationId === `Obligation:Invoice:${mismatchedInvoice.id}`)!;
+    expect(bridge).toMatchObject({ model: { name: "Canonical Obligation Evidence Bridge", version: "0.1-read-only", scope: "payables_receivables_and_purchase_sales_commitments" }, boundary: { readOnlyProjection: true, noObligationSystemOfRecord: true, noInvoiceMutation: true, noPaymentExecution: true, noJournalCreated: true, noPosting: true, noLedgerImpact: true, noValuationCalculation: true, noTaxCalculation: true, noPayrollCalculation: true, noFiling: true, noIntegrationTriggered: true, noExternalEffect: true } });
+    expect(matchedPayable).toMatchObject({ obligationType: "accounts_payable", approvalState: "approved", matchingState: { status: "matched", receiptCount: 1 }, sourceEvidenceReferences: { matchedPurchaseOrder: expect.objectContaining({ recordType: "purchase_order" }), receiptMovements: [expect.objectContaining({ operationalRecordId: expect.any(Number), quantity: 1 })] }, reconciliation: { status: "reconciled" }, evidenceCompleteness: "incomplete", readiness: { amountReconciled: true, eligibleForFutureTreasury: false, eligibleForFutureCashForecasting: false, eligibleForFutureAccounting: false, blocked: true }, boundary: { readOnlyProjection: true, noInvoiceMutation: true, noPaymentExecution: true, noJournalCreated: true, noPosting: true, noLedgerImpact: true, noExternalEffect: true } });
+    expect(matchedPayable.outstandingEvidenceGaps).toContain("No retained invoice due date exists.");
+    expect(mismatchedPayable).toMatchObject({ obligationType: "accounts_payable", matchingState: { status: "mismatch", reasonCodes: ["invoice_exceeds_purchase_order"] }, reconciliation: { status: "exception", exceptions: ["invoice_exceeds_purchase_order"] }, readiness: { amountReconciled: false, blocked: true } });
+    expect(bridge.obligations.some(obligation => obligation.obligationType === "purchase_commitment" && obligation.sourceEvidenceReferences.linkedInvoices.some(invoice => invoice.id === matchedPayable.sourceEvidenceReferences.invoiceRecordId))).toBe(true);
+    expect(await admin.records.list({ ventureId })).toEqual(recordsBefore);
+    expect(await admin.journal.list({ ventureId })).toEqual(journalsBefore);
+  }, 20_000);
+
   it("attaches an approved effective-dated finance classification to retained immutable evidence without recalculating, rewriting, or posting", async () => {
     const operator = callerFor(operatorUserId, operatorOpenId); const admin = callerFor(1, "owner");
     const debitAccount = (await admin.master.list({ ventureId })).find(master => master.domain === "account" && master.code === "VALIDATION-E2E-ACCOUNTING-DEBIT-20260825");

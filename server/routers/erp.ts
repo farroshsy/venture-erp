@@ -120,6 +120,9 @@ export const erpRouter = router({
   canonicalResourceEvidence: router({
     bridge: protectedProcedure.input(ventureInput).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return erp.getCanonicalResourceEvidenceBridge(input.ventureId); }),
   }),
+  canonicalObligationEvidence: router({
+    bridge: protectedProcedure.input(ventureInput).query(async ({ ctx, input }) => { await requireVentureMembership(ctx.user.id, input.ventureId); return erp.getCanonicalObligationEvidenceBridge(input.ventureId); }),
+  }),
   canonicalFinancialObjects: router({
     projection: protectedProcedure.input(ventureInput).query(async ({ ctx, input }) => { const membership = await requireOperationalRole(ctx.user.id, input.ventureId); requireVentureRole(membership.role, ["portfolio_admin", "venture_lead", "finance_lead"]); return erp.getCanonicalFinancialObjectProjection(input.ventureId); }),
   }),

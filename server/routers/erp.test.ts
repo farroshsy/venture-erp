@@ -54,6 +54,7 @@ vi.mock("../erp/service", () => ({
   activateFinanceDimensionValue: vi.fn(),
   listInventoryBalances: vi.fn(),
   getCanonicalResourceEvidenceBridge: vi.fn(),
+  getCanonicalObligationEvidenceBridge: vi.fn(),
   listInventoryMovements: vi.fn(),
   recordInventoryMovement: vi.fn(),
   receivePurchaseOrder: vi.fn(),
@@ -144,6 +145,13 @@ describe("operational ERP router", () => {
     await expect(caller().canonicalResourceEvidence.bridge({ ventureId: 21 })).resolves.toMatchObject({ boundary: { readOnlyProjection: true, noSecondInventoryLedger: true, noInventoryMutation: true, noValuationCalculation: true, noCogsCalculation: true, noJournalCreated: true, noExternalEffect: true } });
     expect(requireVentureMembership).toHaveBeenCalledWith(7, 21);
     expect(service.getCanonicalResourceEvidenceBridge).toHaveBeenCalledWith(21);
+  });
+  it("returns the Canonical Obligation Evidence Bridge only for the active venture without a payment or financial-effect path", async () => {
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "viewer", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.getCanonicalObligationEvidenceBridge).mockResolvedValue({ model: { name: "Canonical Obligation Evidence Bridge", version: "0.1-read-only", scope: "payables_receivables_and_purchase_sales_commitments" }, obligations: [], summary: { obligationCount: 0, accountsPayableCount: 0, accountsReceivableCount: 0, purchaseCommitmentCount: 0, salesCommitmentCount: 0, reconciledCount: 0, exceptionCount: 0, insufficientEvidenceCount: 0 }, boundary: { readOnlyProjection: true, noObligationSystemOfRecord: true, noInvoiceMutation: true, noPaymentExecution: true, noJournalCreated: true, noPosting: true, noLedgerImpact: true, noValuationCalculation: true, noTaxCalculation: true, noPayrollCalculation: true, noFiling: true, noIntegrationTriggered: true, noExternalEffect: true } } as never);
+    await expect(caller().canonicalObligationEvidence.bridge({ ventureId: 21 })).resolves.toMatchObject({ boundary: { readOnlyProjection: true, noObligationSystemOfRecord: true, noInvoiceMutation: true, noPaymentExecution: true, noJournalCreated: true, noPosting: true, noLedgerImpact: true, noValuationCalculation: true, noTaxCalculation: true, noPayrollCalculation: true, noFiling: true, noIntegrationTriggered: true, noExternalEffect: true } });
+    expect(requireVentureMembership).toHaveBeenCalledWith(7, 21);
+    expect(service.getCanonicalObligationEvidenceBridge).toHaveBeenCalledWith(21);
   });
   it("keeps canonical item profiles tenant-scoped, finance-authorized, and free of inventory or financial effects", async () => {
     vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });

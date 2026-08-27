@@ -20,7 +20,7 @@ The architecture records describe the service-aligned modular-monolith strategy,
 | --- | --- |
 | Platform strategy | [Bounded Contexts](architecture/BOUNDED-CONTEXTS.md), [Migration Roadmap](architecture/MIGRATION-ROADMAP.md), [Enterprise Platform Implementation](architecture/ENTERPRISE-PLATFORM-IMPLEMENTATION.md) |
 | Governed finance evidence | [Accounting Event and Posting Control](architecture/ACCOUNTING-EVENT-POSTING-CONTROL-DESIGN.md), [Controlled Finance Reporting](architecture/CONTROLLED-FINANCE-REPORTING-DESIGN.md), [Read-Only Ledger Simulation](architecture/READ-ONLY-LEDGER-SIMULATION-DESIGN.md) |
-| Canonical evidence layer | [CFOM Read Projection](architecture/CANONICAL-FINANCIAL-OBJECT-MODEL-READ-PROJECTION-DESIGN.md), [Semantic Evidence-Gap Register](architecture/SEMANTIC-EVIDENCE-GAP-READINESS-REGISTER-DESIGN.md), [CREB](architecture/CANONICAL-RESOURCE-EVIDENCE-BRIDGE-DESIGN.md), [COEB Roadmap](architecture/CANONICAL-OBLIGATION-EVIDENCE-BRIDGE-ROADMAP.md) |
+| Canonical evidence layer | [CFOM Read Projection](architecture/CANONICAL-FINANCIAL-OBJECT-MODEL-READ-PROJECTION-DESIGN.md), [Semantic Evidence-Gap Register](architecture/SEMANTIC-EVIDENCE-GAP-READINESS-REGISTER-DESIGN.md), [CREB](architecture/CANONICAL-RESOURCE-EVIDENCE-BRIDGE-DESIGN.md), [COEB Design](architecture/CANONICAL-OBLIGATION-EVIDENCE-BRIDGE-DESIGN.md), [COEB Roadmap Decision](architecture/CANONICAL-OBLIGATION-EVIDENCE-BRIDGE-ROADMAP.md) |
 | Inventory and costing | [Costing Engine Foundation](architecture/COSTING-ENGINE-FOUNDATION-DESIGN.md), [Valuation Review](architecture/READ-ONLY-INVENTORY-VALUATION-REVIEW-DESIGN.md), [Canonical Item Profile](architecture/CANONICAL-ITEM-MASTER-PROFILE-DESIGN.md) |
 | Operating controls | [Invoice-to-Payment Control](architecture/INVOICE-TO-PAYMENT-CONTROL-DESIGN.md), [Visual Automation Workbench](architecture/VISUAL-AUTOMATION-WORKBENCH-DESIGN.md), [Asia Operating Coverage](architecture/ASIA-OPERATING-COVERAGE-AND-ROLLOUT.md) |
 | Decisions | [Architecture Decision Records](adr/) |
@@ -34,7 +34,7 @@ The architecture records describe the service-aligned modular-monolith strategy,
 | Accounting evidence, journal proposals, and reporting | Immutable evidence and controlled read/proposal paths are present. | Automatic posting, an authoritative general ledger, formal financial statements, or statutory reporting. |
 | Costing Engine | Immutable layers and deterministic, read-only evidence/preview controls are present. | Financial valuation, layer consumption, COGS, or accounting effects. |
 | Payroll and tax | Indonesia candidate-source evidence pack is retained. | Qualified review, calculated payroll, compliance validation, filing, or production use. |
-| COEB | Authorized future roadmap and documentation only. | A canonical payable/receivable/commitment table, implementation, reconciler, correction path, or treasury function. |
+| COEB | Tenant-scoped, read-only retained-evidence projection for invoices and commitments in Cash Control. | A payable/receivable/commitment system of record, automatic correction, payment execution, journal/posting, treasury function, or external settlement. |
 
 ## Contribution and review path
 
