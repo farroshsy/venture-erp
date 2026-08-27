@@ -53,6 +53,7 @@ vi.mock("../erp/service", () => ({
   createFinanceDimensionValue: vi.fn(),
   activateFinanceDimensionValue: vi.fn(),
   listInventoryBalances: vi.fn(),
+  getCanonicalResourceEvidenceBridge: vi.fn(),
   listInventoryMovements: vi.fn(),
   recordInventoryMovement: vi.fn(),
   receivePurchaseOrder: vi.fn(),
@@ -136,6 +137,13 @@ describe("operational ERP router", () => {
     vi.mocked(service.listOperationalRecords).mockResolvedValue([]);
     await expect(caller().records.list({ ventureId: 21 })).resolves.toEqual([]);
     expect(requireVentureMembership).toHaveBeenCalledWith(7, 21);
+  });
+  it("returns the Canonical Resource Evidence Bridge only for the active venture without an inventory mutation path", async () => {
+    vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "viewer", status: "active", createdAt: new Date(), updatedAt: new Date() });
+    vi.mocked(service.getCanonicalResourceEvidenceBridge).mockResolvedValue({ model: { name: "Canonical Resource Evidence Bridge", version: "0.1-read-only", scope: "inventory_items_initially" }, resources: [], summary: { resourceCount: 0, reconciledCount: 0, exceptionCount: 0 }, boundary: { readOnlyProjection: true, noSecondInventoryLedger: true, noInventoryMutation: true, noValuationCalculation: true, noCogsCalculation: true, noJournalCreated: true, noExternalEffect: true } } as never);
+    await expect(caller().canonicalResourceEvidence.bridge({ ventureId: 21 })).resolves.toMatchObject({ boundary: { readOnlyProjection: true, noSecondInventoryLedger: true, noInventoryMutation: true, noValuationCalculation: true, noCogsCalculation: true, noJournalCreated: true, noExternalEffect: true } });
+    expect(requireVentureMembership).toHaveBeenCalledWith(7, 21);
+    expect(service.getCanonicalResourceEvidenceBridge).toHaveBeenCalledWith(21);
   });
   it("keeps canonical item profiles tenant-scoped, finance-authorized, and free of inventory or financial effects", async () => {
     vi.mocked(requireVentureMembership).mockResolvedValue({ id: 1, userId: 7, ventureId: 21, role: "finance_lead", status: "active", createdAt: new Date(), updatedAt: new Date() });
