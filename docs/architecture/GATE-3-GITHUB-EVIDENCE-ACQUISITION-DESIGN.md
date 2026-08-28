@@ -64,6 +64,25 @@ The initial connection retains repository engineering evidence from a private re
 
 Gate 3 cannot be called passed merely because a repository was connected. Exit evidence requires an authorized tenant connection, a real bounded acquisition, independently reviewed provenance/normalization/reconciliation evidence, coverage/freshness interpretation, revocation exercise, documented retention/deletion decision, and no-effect/integrity proof. The payroll pack remains draft-only, inactive, unreviewed, unselected, and unavailable for calculation, rehearsal, activation, or production until a qualified Indonesian payroll/tax reviewer supplies the required written, effective-dated approval.
 
+## 8. Gate 3B — first real repository-metadata observation
+
+**Status:** Approved proof protocol; no persistent source connection or real source evidence has been created by this protocol section. The user has authorized a deliberately narrow real-observation attempt. It does not supersede the connection’s required separate human authorization or the evidence record’s required separate human review.
+
+| Protocol field | Fixed Gate 3B value | Interpretation boundary |
+| --- | --- | --- |
+| Candidate source | `farroshsy/venture-erp` only | No other repository, organization, provider, issue, pull request, commit, release, content, artifact, or historical backfill is authorized by this protocol. |
+| Candidate resource | One GitHub **repository metadata** object | The service makes one bounded metadata request after the source connection is separately authorized and explicitly activated. |
+| Candidate connection key | `github-venture-erp-meta-20260827` | The key identifies one tenant-scoped proof record; it is not a credential, connection-sharing mechanism, or production integration name. |
+| Declared classification | `confidential` | This reflects the source owner’s private-repository posture and does not classify every field, create a privacy approval, or establish a retention basis. |
+| Authorization reference | User-provided Gate 3B instruction retained in `pasted_content_26.txt` | The instruction permits the narrow proof attempt; it does not replace the separate in-application authorizer or reviewer. |
+| Retention decision | Preserve the one filtered observation and its review/audit lineage under the connection’s declared policy until a separately governed deletion decision is approved. | No automatic purge, provider-side deletion, legal-retention conclusion, or deletion workflow is enabled. |
+| Allowed EOS use before review | Source-connection/run/provenance visibility only. | The observation is not admitted to a metric, operational record, canonical model, financial/HR/customer/supplier fact, decision, recommendation, or causal claim. |
+| Allowed EOS use after review | A reviewed external-evidence node and its exact provenance lineage may remain visible in External Evidence, Knowledge Graph, and Decision Intelligence **source readiness**. | Review does not make the observation complete, accurate, timely, representative, ERP truth, metric truth, engineering-performance evidence, or a Gate 3 exit result. |
+
+The required sequence is: (1) retain a draft connection with this protocol’s policy statements; (2) perform one server-side validation only; (3) a **different authorized leader** authorizes the connection; (4) an authorized leader activates it; (5) request one repository-metadata page with limit one; (6) inspect the retained source URL, object ID, timestamps, provider/normalizer versions, hashes, review posture, and exact graph/readiness links; and (7) a **different authorized reviewer** records the permitted downstream use and limitations. Any unavailable/deleted source, duplicate version, partial/failure result, or authorization refusal remains an explicit evidence state and is not silently retried.
+
+The Gate 3B observation must answer only: what repository object was requested and retained; when it was received; under which tenant, connection, authorization, and provider/normalizer versions; whether its raw and source-version hashes reconcile to its normalized projection; whether a separate reviewer admitted or rejected the retained evidence; where its exact nodes/edges/readiness disclosure appear; and what it still does **not** prove. It must not establish source completeness, engineering activity/performance, release quality, user adoption, financial outcome, payroll readiness, legal compliance, causality, prediction, recommendation, or Gate 3 passage.
+
 ## References
 
 [1] [GitHub Docs — REST API documentation](https://docs.github.com/en/rest)
